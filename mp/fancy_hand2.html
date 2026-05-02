@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sci-Fi Hand Tracking - Finger Number Music</title>
-    
+    <title>Sci-Fi Hand Tracking - Gesture Music Controller</title>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
     <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
@@ -17,7 +17,7 @@
         overflow: hidden;
         font-family: 'Courier New', monospace;
       }
-      
+
       .nav-group {
         position: fixed;
         top: 20px;
@@ -26,18 +26,18 @@
         display: flex;
         gap: 10px;
       }
-      
-      .nav-btn { 
+
+      .nav-btn {
         padding: 10px 15px;
         font-size: 0.75em;
-        border-radius: 4px; 
+        border-radius: 4px;
         text-decoration: none;
         text-transform: uppercase;
         letter-spacing: 2px;
         transition: all 0.3s;
         cursor: pointer;
       }
-      
+
       #back-btn {
         background: rgba(0, 255, 255, 0.05);
         border: 1px solid rgba(0, 255, 255, 0.2);
@@ -49,7 +49,7 @@
         border: 1px solid rgba(255, 50, 50, 0.3);
         color: #f33;
       }
-      
+
       .nav-btn:hover {
         background: rgba(255, 255, 255, 0.15);
         box-shadow: 0 0 10px currentColor;
@@ -97,7 +97,7 @@
       <a href="../perception_demo.html" id="back-btn" class="nav-btn">HUB</a>
       <div id="reload-btn" class="nav-btn" onclick="location.reload()">RELOAD SYSTEM</div>
     </div>
-    
+
     <div id="status-log">SYSTEM IDLE</div>
 
     <div id="overlay">
@@ -109,14 +109,15 @@
     <script>
       let video, handPose, hands = [];
       let isReady = false;
-      let smoothedAngle = [0, 0], lastTickAngle = [0, 0], smoothedPos = [{x:0, y:0}, {x:0, y:0}];
-      let mainColor, colors = ['#00ffff', '#ff00ff', '#ffff00'], colorIdx = 0;
-      let glitchTimer = 0, osc, envelope, linkOsc;
+      let smoothedAngle = [0, 0];
+      let lastTickAngle = [0, 0];
+      let smoothedPos = [{x:0, y:0}, {x:0, y:0}];
+      let mainColor;
+      let colors = ['#00ffff', '#ff00ff', '#ffff00'];
+      let colorIdx = 0;
+      let glitchTimer = 0;
+      let osc, envelope, linkOsc;
       let modelCheckTimer = 0;
-
-      // ===== 手指數字觸發整段音樂 =====
-      // 使用方式：伸出 1 到 5 根手指，維持一下，就會觸發對應樂曲。
-      // 這裡用 p5.sound 合成器即時演奏，不需要 mp3 / wav 檔案。
 
       const NOTES = {
         C2: 65.41, Cs2: 69.30, D2: 73.42, Ds2: 77.78, E2: 82.41, F2: 87.31, Fs2: 92.50, G2: 98.00, Gs2: 103.83, A2: 110.00, As2: 116.54, B2: 123.47,
@@ -126,13 +127,9 @@
         C6: 1046.50, Cs6: 1108.73, D6: 1174.66, Ds6: 1244.51, E6: 1318.51, F6: 1396.91, Fs6: 1479.98, G6: 1567.98, A6: 1760.00
       };
 
-      const fingerSongMap = {
-        1: {
-          title: '1 - Mozart / Eine kleine Nachtmusik',
-          shortTitle: 'MOZART VIOLIN',
-          instrument: 'violin',
-          color: [255, 90, 140],
-          tempo: 1.0,
+      const tracks = {
+        '1': {
+          key: '1', title: '1 - Mozart / Eine kleine Nachtmusik', shortTitle: 'MOZART VIOLIN', instrument: 'violin', color: [255, 90, 140], tempo: 1.0,
           melody: [
             { n: 'G4', d: 220 }, { n: 'D4', d: 220 }, { n: 'G4', d: 220 }, { n: 'B4', d: 220 }, { n: 'D5', d: 440 }, { n: 'B4', d: 220 }, { n: 'G4', d: 440 },
             { n: 'D5', d: 220 }, { n: 'B4', d: 220 }, { n: 'D5', d: 220 }, { n: 'G5', d: 220 }, { n: 'Fs5', d: 300 }, { n: 'E5', d: 140 }, { n: 'D5', d: 440 },
@@ -144,12 +141,8 @@
             { n: 'C3', d: 440 }, { n: 'D3', d: 440 }, { n: 'G2', d: 880 }
           ]
         },
-        2: {
-          title: '2 - Beethoven / Fur Elise',
-          shortTitle: 'BEETHOVEN PIANO',
-          instrument: 'piano',
-          color: [120, 220, 255],
-          tempo: 1.0,
+        '2': {
+          key: '2', title: '2 - Beethoven / Fur Elise', shortTitle: 'BEETHOVEN PIANO', instrument: 'piano', color: [120, 220, 255], tempo: 1.0,
           melody: [
             { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'B4', d: 160 }, { n: 'D5', d: 160 }, { n: 'C5', d: 160 }, { n: 'A4', d: 420 },
             { n: 'C4', d: 160 }, { n: 'E4', d: 160 }, { n: 'A4', d: 160 }, { n: 'B4', d: 420 },
@@ -160,12 +153,8 @@
             { n: 'A2', d: 640 }, { n: 'E3', d: 640 }, { n: 'A2', d: 640 }, { n: 'E3', d: 640 }, { n: 'A2', d: 880 }
           ]
         },
-        3: {
-          title: '3 - Bach / Minuet in G',
-          shortTitle: 'BACH HARPSICHORD',
-          instrument: 'harpsichord',
-          color: [255, 255, 140],
-          tempo: 0.95,
+        '3': {
+          key: '3', title: '3 - Bach / Minuet in G', shortTitle: 'BACH HARPSICHORD', instrument: 'harpsichord', color: [255, 255, 140], tempo: 0.95,
           melody: [
             { n: 'G4', d: 220 }, { n: 'D5', d: 220 }, { n: 'B4', d: 220 }, { n: 'C5', d: 220 }, { n: 'D5', d: 440 }, { n: 'G4', d: 220 }, { n: 'G4', d: 220 },
             { n: 'E5', d: 220 }, { n: 'C5', d: 220 }, { n: 'D5', d: 220 }, { n: 'E5', d: 220 }, { n: 'Fs5', d: 440 }, { n: 'G5', d: 220 }, { n: 'G4', d: 220 },
@@ -176,12 +165,8 @@
             { n: 'G3', d: 660 }, { n: 'D3', d: 660 }, { n: 'C3', d: 660 }, { n: 'D3', d: 660 }, { n: 'G2', d: 660 }
           ]
         },
-        4: {
-          title: '4 - Vivaldi / Spring',
-          shortTitle: 'VIVALDI STRINGS',
-          instrument: 'strings',
-          color: [150, 255, 160],
-          tempo: 0.82,
+        '4': {
+          key: '4', title: '4 - Vivaldi / Spring', shortTitle: 'VIVALDI STRINGS', instrument: 'strings', color: [150, 255, 160], tempo: 0.82,
           melody: [
             { n: 'E5', d: 180 }, { n: 'E5', d: 180 }, { n: 'E5', d: 180 }, { n: 'D5', d: 180 }, { n: 'C5', d: 360 }, { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 360 },
             { n: 'G5', d: 180 }, { n: 'G5', d: 180 }, { n: 'G5', d: 180 }, { n: 'F5', d: 180 }, { n: 'E5', d: 360 }, { n: 'D5', d: 180 }, { n: 'C5', d: 180 }, { n: 'B4', d: 360 },
@@ -192,12 +177,8 @@
             { n: 'C3', d: 720 }, { n: 'G2', d: 720 }, { n: 'C3', d: 720 }, { n: 'G2', d: 720 }, { n: 'C3', d: 720 }
           ]
         },
-        5: {
-          title: '5 - Pachelbel / Canon in D',
-          shortTitle: 'CANON ORCHESTRA',
-          instrument: 'pad',
-          color: [220, 160, 255],
-          tempo: 1.05,
+        '5': {
+          key: '5', title: '5 - Pachelbel / Canon in D', shortTitle: 'CANON ORCHESTRA', instrument: 'pad', color: [220, 160, 255], tempo: 1.05,
           melody: [
             { chord: ['D4', 'Fs4', 'A4'], d: 520 }, { chord: ['A3', 'Cs4', 'E4'], d: 520 }, { chord: ['B3', 'D4', 'Fs4'], d: 520 }, { chord: ['Fs3', 'A3', 'Cs4'], d: 520 },
             { chord: ['G3', 'B3', 'D4'], d: 520 }, { chord: ['D3', 'Fs3', 'A3'], d: 520 }, { chord: ['G3', 'B3', 'D4'], d: 520 }, { chord: ['A3', 'Cs4', 'E4'], d: 520 },
@@ -208,54 +189,56 @@
             { n: 'G2', d: 520 }, { n: 'D2', d: 520 }, { n: 'G2', d: 520 }, { n: 'A2', d: 520 }
           ]
         },
-        6: {
-          title: '6 - Baby Shark',
-          shortTitle: 'BABY SHARK',
-          instrument: 'babySynth',
-          color: [255, 210, 80],
-          tempo: 1.0,
-          // 內建 Baby Shark 風格合成器旋律，不需要任何 mp3 / wav 音檔。
+        '6': {
+          key: '6', title: '6 - Baby Shark / Built-in Synth', shortTitle: 'BABY SHARK', instrument: 'babySynth', color: [255, 210, 80], tempo: 1.0,
           melody: [
             { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 180 },
             { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 260 },
             { n: 'E5', d: 180 }, { n: 'F5', d: 180 }, { n: 'G5', d: 240 }, { n: 'E5', d: 180 },
             { n: 'F5', d: 180 }, { n: 'G5', d: 320 },
-            { n: 'G5', d: 140 }, { n: 'A5', d: 140 }, { n: 'G5', d: 140 }, { n: 'E5', d: 140 },
-            { n: 'C5', d: 360 }
+            { n: 'G5', d: 140 }, { n: 'A5', d: 140 }, { n: 'G5', d: 140 }, { n: 'E5', d: 140 }, { n: 'C5', d: 360 }
           ],
           bass: [
             { n: 'C3', d: 360 }, { n: 'G3', d: 360 }, { n: 'C3', d: 360 }, { n: 'G3', d: 360 },
             { n: 'F3', d: 360 }, { n: 'G3', d: 360 }, { n: 'C3', d: 520 }
           ]
+        },
+        'O': {
+          key: 'O', title: 'O - Katy Perry / Roar.mp3', shortTitle: 'ROAR MP3', instrument: 'mp3', color: [255, 120, 80], file: 'Katy Perry - Roar.mp3'
         }
       };
 
-      let detectedFingerCount = 0;
-      let countCandidate = 0;
-      let countStableFrames = 0;
-      let lastTriggeredCount = 0;
-      let lastSongTriggerFrame = -999;
-      let currentSongNumber = 0;
-      let currentSongTitle = '';
+      let selectedTrackKey = '1';
+      let selectedTrack = tracks[selectedTrackKey];
+      let playingTrackKey = null;
+      let playerState = 'stopped'; // stopped / playing / paused
+      let currentSongTitle = 'No music playing';
       let currentSongColor = [0, 255, 255];
-      let currentSongTimers = [];
-      let songPlayingFrames = 0;
+      let songTimers = [];
+      let activeOscillators = [];
+      let trackStartMs = 0;
+      let pauseElapsedMs = 0;
+      let audioPauseTime = 0;
 
-      // ===== 比 O / OK 手勢播放本機 MP3 =====
-      // 請把音檔放在 html 同一個資料夾，檔名必須完全相同：Katy Perry - Roar.mp3
       let roarSound = null;
       let roarLoadStarted = false;
-      let okGestureDetected = false;
-      let okGestureStableFrames = 0;
-      let okGestureActive = false;
-      let lastOKTriggerFrame = -999;
 
+      let detectedFingerCount = 0;
+      let handCounts = [];
 
-      const COUNT_STABLE_FRAMES = 22;
-      const SONG_TRIGGER_COOLDOWN_FRAMES = 90;
+      let selectionCandidate = '';
+      let selectionStableFrames = 0;
+      let lastSelectionTriggerFrame = -999;
+
+      let controlCandidate = '';
+      let controlStableFrames = 0;
+      let lastControlTriggerFrame = -999;
+
+      const SELECTION_STABLE_FRAMES = 20;
+      const CONTROL_STABLE_FRAMES = 20;
+      const SELECTION_COOLDOWN_FRAMES = 70;
+      const CONTROL_COOLDOWN_FRAMES = 70;
       const MAX_FINGER_COUNT = 6;
-      const OK_GESTURE_STABLE_FRAMES = 18;
-      const OK_GESTURE_COOLDOWN_FRAMES = 150;
 
       let buttons = [
         { label: 'COLOR', x: 40, y: 120, w: 90, h: 40, active: false },
@@ -265,21 +248,19 @@
       function setup() {
         createCanvas(windowWidth, windowHeight);
         mainColor = color(colors[colorIdx]);
-        
-        // 原本的短音效系統
+
         osc = new p5.Oscillator('sine');
         envelope = new p5.Envelope();
         envelope.setADSR(0.001, 0.05, 0.1, 0.1);
         envelope.setRange(0.5, 0);
 
-        // 原本的雙手能量連線低頻音
         linkOsc = new p5.Oscillator('sawtooth');
         linkOsc.amp(0);
-        
+
         handPose = ml5.handPose({ flipped: true, maxHands: 2 }, () => {
           document.getElementById('loading-msg').style.display = 'none';
           document.getElementById('init-btn').style.display = 'block';
-          updateLog("MODEL ENGINE READY");
+          updateLog('MODEL ENGINE READY');
         });
 
         angleMode(DEGREES);
@@ -291,7 +272,6 @@
       }
 
       function initSystem() {
-        // 瀏覽器規定音效必須由使用者點擊後啟動
         userStartAudio();
         playBootSound();
         loadRoarSound();
@@ -307,12 +287,26 @@
 
       function startDetection() {
         isReady = true;
-        updateLog("INITIALIZING DETECTOR...");
+        updateLog('INITIALIZING DETECTOR...');
 
         handPose.detectStart(video, results => {
           hands = results;
           modelCheckTimer = 0;
         });
+      }
+
+      function loadRoarSound() {
+        if (roarLoadStarted || roarSound) return;
+        roarLoadStarted = true;
+
+        roarSound = loadSound(
+          'Katy Perry - Roar.mp3',
+          () => updateLog('ROAR MP3 READY'),
+          () => {
+            roarSound = null;
+            updateLog('ROAR MP3 NOT FOUND');
+          }
+        );
       }
 
       function playTone(freq) {
@@ -335,8 +329,8 @@
         if (!isReady) return;
 
         modelCheckTimer++;
-        if (modelCheckTimer > 180) { 
-          updateLog("DETECTOR HANG DETECTED. RESTARTING...");
+        if (modelCheckTimer > 180) {
+          updateLog('DETECTOR HANG DETECTED. RESTARTING...');
           startDetection();
           modelCheckTimer = 0;
         }
@@ -353,6 +347,9 @@
         pop();
 
         if (hands && hands.length > 0) {
+          handCounts = hands.map(h => countExtendedFingers(h));
+          detectedFingerCount = constrain(handCounts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
+
           for (let i = 0; i < hands.length; i++) {
             let hand = hands[i];
             let indexTip = hand.keypoints[8];
@@ -366,12 +363,15 @@
             drawCursor(tx, ty);
           }
 
-          // 比 O / OK 手勢會優先觸發 Roar.mp3，避免同時被誤判成數字手勢
-          updateOKGestureTrigger(hands);
+          let control = detectControlGesture(hands, handCounts);
+          updateControlGesture(control);
 
-          // 使用雙手合計判斷 1 到 6；例如一手 5 根 + 另一手 1 根 = 6
-          if (!okGestureDetected) {
-            updateFingerCountTrigger(hands);
+          // 控制手勢優先，避免播放控制與選歌互相干擾。
+          if (!control) {
+            let selection = detectSelectionGesture(hands, handCounts);
+            updateSelectionGesture(selection);
+          } else {
+            updateSelectionGesture('');
           }
 
           if (hands.length === 2) {
@@ -393,68 +393,48 @@
         } else {
           linkOsc.amp(0, 0.5);
           detectedFingerCount = 0;
-          countCandidate = 0;
-          countStableFrames = 0;
-          lastTriggeredCount = 0;
-          okGestureDetected = false;
-          okGestureStableFrames = 0;
-          okGestureActive = false;
+          handCounts = [];
+          updateSelectionGesture('');
+          updateControlGesture('');
           drawScanningUI();
         }
 
         drawVirtualButtons(gx, gy);
-        drawSongPanel();
-        drawFingerCountHUD();
-        drawNowPlayingHUD();
-        drawOKGestureHUD();
-
-        if (songPlayingFrames > 0) songPlayingFrames--;
+        drawGestureGuide();
+        drawStatusHUD();
       }
 
-      // ===== 比 O / OK 手勢：播放 Katy Perry - Roar.mp3 =====
-      function loadRoarSound() {
-        if (roarLoadStarted || roarSound) return;
+      // ===== 選曲手勢：數字 1 到 6，以及 O / OK =====
+      function detectSelectionGesture(activeHands, counts) {
+        if (activeHands.some(h => isOKGesture(h))) return 'O';
 
-        roarLoadStarted = true;
-
-        roarSound = loadSound(
-          'Katy Perry - Roar.mp3',
-          () => {
-            updateLog('ROAR MP3 READY');
-          },
-          () => {
-            roarSound = null;
-            updateLog('ROAR MP3 NOT FOUND');
-          }
-        );
+        let total = constrain(counts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
+        if (total >= 1 && total <= MAX_FINGER_COUNT) return String(total);
+        return '';
       }
 
-      function updateOKGestureTrigger(activeHands) {
-        okGestureDetected = false;
-
-        for (let i = 0; i < activeHands.length; i++) {
-          if (isOKGesture(activeHands[i])) {
-            okGestureDetected = true;
-            break;
-          }
-        }
-
-        if (okGestureDetected) {
-          okGestureStableFrames++;
+      function updateSelectionGesture(selection) {
+        if (selection === selectionCandidate) {
+          selectionStableFrames++;
         } else {
-          okGestureStableFrames = 0;
-          okGestureActive = false;
-          return;
+          selectionCandidate = selection;
+          selectionStableFrames = 0;
         }
 
-        let stable = okGestureStableFrames > OK_GESTURE_STABLE_FRAMES;
-        let cooledDown = frameCount - lastOKTriggerFrame > OK_GESTURE_COOLDOWN_FRAMES;
+        let stable = selectionStableFrames > SELECTION_STABLE_FRAMES;
+        let cooledDown = frameCount - lastSelectionTriggerFrame > SELECTION_COOLDOWN_FRAMES;
 
-        if (stable && !okGestureActive && cooledDown) {
-          playRoarSong();
-          okGestureActive = true;
-          lastOKTriggerFrame = frameCount;
+        if (selection && stable && cooledDown && tracks[selection]) {
+          selectTrack(selection);
+          lastSelectionTriggerFrame = frameCount;
         }
+      }
+
+      function selectTrack(key) {
+        selectedTrackKey = key;
+        selectedTrack = tracks[key];
+        currentSongColor = selectedTrack.color;
+        updateLog(`SELECTED ${selectedTrack.shortTitle}. USE PLAY GESTURE.`);
       }
 
       function isOKGesture(hand) {
@@ -463,181 +443,228 @@
         let indexTip = kp[8];
         let wrist = kp[0];
         let palm = kp[9];
-
         let handScale = dist(wrist.x, wrist.y, palm.x, palm.y);
         let thumbIndexDistance = dist(thumbTip.x, thumbTip.y, indexTip.x, indexTip.y);
         let okThreshold = max(22, handScale * 0.42);
-
-        // 拇指尖與食指尖靠近，視為比 O / OK。
         return thumbIndexDistance < okThreshold;
       }
 
-      function playRoarSong() {
-        stopScheduledSong();
+      // ===== 播放控制手勢 =====
+      // PLAY / RESUME：雙手張開，總手指數 9 到 10。
+      // PAUSE：單手握拳，0 根手指。
+      // STOP：雙手握拳，總手指數 0。
+      function detectControlGesture(activeHands, counts) {
+        let total = counts.reduce((a, b) => a + b, 0);
 
-        currentSongNumber = 0;
-        currentSongTitle = 'O - Katy Perry / Roar.mp3';
-        currentSongColor = [255, 120, 80];
-        songPlayingFrames = 360;
+        if (activeHands.length >= 2 && counts[0] === 0 && counts[1] === 0) return 'STOP';
+        if (activeHands.length >= 2 && total >= 9) return 'PLAY';
+        if (activeHands.length === 1 && counts[0] === 0) return 'PAUSE';
+        return '';
+      }
 
-        if (roarSound && roarSound.isLoaded()) {
-          roarSound.stop();
-          roarSound.setVolume(0.9);
-          roarSound.play();
-          updateLog('OK GESTURE: PLAYING ROAR.MP3');
+      function updateControlGesture(control) {
+        if (control === controlCandidate) {
+          controlStableFrames++;
         } else {
-          updateLog('OK GESTURE DETECTED - ROAR.MP3 NOT READY');
-          playTone(220);
+          controlCandidate = control;
+          controlStableFrames = 0;
+        }
+
+        let stable = controlStableFrames > CONTROL_STABLE_FRAMES;
+        let cooledDown = frameCount - lastControlTriggerFrame > CONTROL_COOLDOWN_FRAMES;
+
+        if (control && stable && cooledDown) {
+          if (control === 'PLAY') startOrResumeSelectedTrack();
+          if (control === 'PAUSE') pausePlayback();
+          if (control === 'STOP') stopPlayback(true);
+          lastControlTriggerFrame = frameCount;
         }
       }
 
-      // ===== 判斷伸出幾根手指 =====
-      function updateFingerCountTrigger(activeHands) {
-        detectedFingerCount = countTotalExtendedFingers(activeHands);
+      // ===== 播放器：支援開始、暫停、停止、繼續 =====
+      function startOrResumeSelectedTrack() {
+        if (!selectedTrack) return;
 
-        if (detectedFingerCount === countCandidate) {
-          countStableFrames++;
-        } else {
-          countCandidate = detectedFingerCount;
-          countStableFrames = 0;
+        if (playerState === 'paused' && playingTrackKey === selectedTrackKey) {
+          resumePlayback();
+          return;
         }
 
-        let isStable = countStableFrames > COUNT_STABLE_FRAMES;
-        let inRange = detectedFingerCount >= 1 && detectedFingerCount <= MAX_FINGER_COUNT;
-        let cooledDown = frameCount - lastSongTriggerFrame > SONG_TRIGGER_COOLDOWN_FRAMES;
+        playSelectedTrackFromStart();
+      }
 
-        if (isStable && inRange && cooledDown && detectedFingerCount !== lastTriggeredCount) {
-          startSongByFingerCount(detectedFingerCount);
-          lastTriggeredCount = detectedFingerCount;
-          lastSongTriggerFrame = frameCount;
+      function playSelectedTrackFromStart() {
+        stopPlayback(false);
+
+        playingTrackKey = selectedTrackKey;
+        currentSongTitle = selectedTrack.title;
+        currentSongColor = selectedTrack.color;
+        playerState = 'playing';
+        pauseElapsedMs = 0;
+        audioPauseTime = 0;
+        trackStartMs = millis();
+
+        if (selectedTrack.instrument === 'mp3') {
+          if (roarSound && roarSound.isLoaded()) {
+            roarSound.stop();
+            roarSound.setVolume(0.9);
+            roarSound.play();
+            updateLog(`PLAYING ${selectedTrack.shortTitle}`);
+          } else {
+            updateLog('ROAR MP3 NOT READY OR FILE NOT FOUND');
+            playTone(220);
+            playerState = 'stopped';
+          }
+          return;
         }
 
-        // 手勢回到 0，才允許同一個數字再次觸發
-        if (detectedFingerCount === 0 && isStable) {
-          lastTriggeredCount = 0;
+        scheduleSynthTrack(selectedTrack, 0);
+        updateLog(`PLAYING ${selectedTrack.shortTitle}`);
+      }
+
+      function pausePlayback() {
+        if (playerState !== 'playing') return;
+
+        let track = tracks[playingTrackKey];
+        pauseElapsedMs = millis() - trackStartMs;
+
+        clearSongTimers();
+        stopActiveOscillators();
+
+        if (track && track.instrument === 'mp3' && roarSound && roarSound.isPlaying()) {
+          audioPauseTime = roarSound.currentTime();
+          roarSound.pause();
         }
+
+        playerState = 'paused';
+        updateLog('PLAYBACK PAUSED');
       }
 
-      function countTotalExtendedFingers(activeHands) {
-        let total = 0;
+      function resumePlayback() {
+        if (playerState !== 'paused' || !playingTrackKey) return;
 
-        for (let i = 0; i < activeHands.length; i++) {
-          total += countExtendedFingers(activeHands[i]);
+        let track = tracks[playingTrackKey];
+        playerState = 'playing';
+        trackStartMs = millis() - pauseElapsedMs;
+        currentSongTitle = track.title;
+        currentSongColor = track.color;
+
+        if (track.instrument === 'mp3') {
+          if (roarSound && roarSound.isLoaded()) {
+            roarSound.play(0, 1, 0.9, audioPauseTime);
+            updateLog(`RESUMED ${track.shortTitle}`);
+          }
+          return;
         }
 
-        return constrain(total, 0, MAX_FINGER_COUNT);
+        scheduleSynthTrack(track, pauseElapsedMs);
+        updateLog(`RESUMED ${track.shortTitle}`);
       }
 
-      function countExtendedFingers(hand) {
-        let count = 0;
-        let kp = hand.keypoints;
-        let palm = kp[9];
-
-        // 拇指：用拇指尖到掌心的距離，判斷是否張開
-        let thumbTip = kp[4];
-        let thumbIp = kp[3];
-        let thumbOpen = dist(thumbTip.x, thumbTip.y, palm.x, palm.y) > dist(thumbIp.x, thumbIp.y, palm.x, palm.y) + 18;
-        if (thumbOpen) count++;
-
-        // 其餘四指：指尖比 PIP 關節更高，視為伸出
-        if (kp[8].y < kp[6].y - 10) count++;   // 食指
-        if (kp[12].y < kp[10].y - 10) count++; // 中指
-        if (kp[16].y < kp[14].y - 10) count++; // 無名指
-        if (kp[20].y < kp[18].y - 10) count++; // 小指
-
-        return constrain(count, 0, 5);
-      }
-
-      function startSongByFingerCount(count) {
-        let song = fingerSongMap[count];
-        if (!song) return;
-
-        stopScheduledSong();
-
-        currentSongNumber = count;
-        currentSongTitle = song.title;
-        currentSongColor = song.color;
-        songPlayingFrames = 240;
-        updateLog(`FINGER COUNT ${count}: PLAYING ${song.shortTitle}`);
-
-        playSong(song);
-      }
-
-      function stopScheduledSong() {
-        currentSongTimers.forEach(timer => clearTimeout(timer));
-        currentSongTimers = [];
+      function stopPlayback(showLog) {
+        clearSongTimers();
+        stopActiveOscillators();
 
         if (roarSound && roarSound.isPlaying && roarSound.isPlaying()) {
           roarSound.stop();
         }
+
+        playerState = 'stopped';
+        playingTrackKey = null;
+        pauseElapsedMs = 0;
+        audioPauseTime = 0;
+        currentSongTitle = 'No music playing';
+
+        if (showLog) updateLog('PLAYBACK STOPPED');
       }
 
-      function playSong(song) {
-
-        let melodyTotal = scheduleSequence(song.melody, song.instrument, 0, song.tempo, 1.0);
-
-        if (song.bass) {
-          scheduleSequence(song.bass, 'bass', 0, song.tempo, 0.72);
-        }
-
-        let endTimer = setTimeout(() => {
-          if (currentSongTitle === song.title) {
-            songPlayingFrames = 0;
-            updateLog(`${song.shortTitle} COMPLETE`);
-          }
-        }, melodyTotal + 900);
-
-        currentSongTimers.push(endTimer);
+      function clearSongTimers() {
+        songTimers.forEach(timer => clearTimeout(timer));
+        songTimers = [];
       }
 
-      function scheduleSequence(sequence, instrument, startDelay, tempo, volumeScale) {
-        let currentTime = startDelay;
+      function stopActiveOscillators() {
+        activeOscillators.forEach(o => {
+          try { o.stop(); } catch (e) {}
+        });
+        activeOscillators = [];
+      }
 
-        sequence.forEach(step => {
-          let delay = currentTime;
-          let dur = step.d * tempo;
+      function scheduleSynthTrack(track, offsetMs) {
+        clearSongTimers();
 
+        let events = buildTrackEvents(track);
+        let lastTime = 0;
+
+        events.forEach(event => {
+          lastTime = max(lastTime, event.time + event.dur);
+          if (event.time + event.dur < offsetMs) return;
+
+          let delay = max(0, event.time - offsetMs);
           let timer = setTimeout(() => {
-            if (step.n && step.n !== 'R') {
-              playInstrumentNote(NOTES[step.n], dur, instrument, volumeScale);
-            }
+            if (playerState !== 'playing' || playingTrackKey !== track.key) return;
 
-            if (step.chord) {
-              playChord(step.chord, dur, instrument, volumeScale);
-            }
+            if (event.note) playInstrumentNote(event.freq, event.dur, event.instrument, event.volume);
+            if (event.chord) playChord(event.chord, event.dur, event.instrument, event.volume);
           }, delay);
 
-          currentSongTimers.push(timer);
-          currentTime += dur;
+          songTimers.push(timer);
         });
 
-        return currentTime;
+        let endDelay = max(0, lastTime - offsetMs + 900);
+        let endTimer = setTimeout(() => {
+          if (playerState === 'playing' && playingTrackKey === track.key) {
+            playerState = 'stopped';
+            playingTrackKey = null;
+            updateLog(`${track.shortTitle} COMPLETE`);
+          }
+        }, endDelay);
+        songTimers.push(endTimer);
+      }
+
+      function buildTrackEvents(track) {
+        let events = [];
+        appendSequenceEvents(events, track.melody || [], track.instrument, track.tempo || 1, 1.0, 0);
+        appendSequenceEvents(events, track.bass || [], 'bass', track.tempo || 1, 0.72, 0);
+        events.sort((a, b) => a.time - b.time);
+        return events;
+      }
+
+      function appendSequenceEvents(events, sequence, instrument, tempo, volume, startAt) {
+        let t = startAt;
+        sequence.forEach(step => {
+          let dur = step.d * tempo;
+          if (step.n && step.n !== 'R') {
+            events.push({ time: t, dur, instrument, volume, note: step.n, freq: NOTES[step.n] });
+          }
+          if (step.chord) {
+            events.push({ time: t, dur, instrument, volume, chord: step.chord });
+          }
+          t += dur;
+        });
       }
 
       function playInstrumentNote(freq, dur, instrument, volumeScale = 1) {
         if (!freq) return;
-
-        if (instrument === 'piano') {
-          playPianoNote(freq, dur, volumeScale);
-        } else if (instrument === 'violin') {
-          playViolinNote(freq, dur, volumeScale);
-        } else if (instrument === 'harpsichord') {
-          playHarpsichordNote(freq, dur, volumeScale);
-        } else if (instrument === 'strings') {
-          playStringNote(freq, dur, volumeScale);
-        } else if (instrument === 'pad') {
-          playPadNote(freq, dur, volumeScale);
-        } else if (instrument === 'babySynth') {
-          playBabySynthNote(freq, dur, volumeScale);
-        } else if (instrument === 'bass') {
-          playBassNote(freq, dur, volumeScale);
-        }
+        if (instrument === 'piano') playPianoNote(freq, dur, volumeScale);
+        else if (instrument === 'violin') playViolinNote(freq, dur, volumeScale);
+        else if (instrument === 'harpsichord') playHarpsichordNote(freq, dur, volumeScale);
+        else if (instrument === 'strings') playStringNote(freq, dur, volumeScale);
+        else if (instrument === 'pad') playPadNote(freq, dur, volumeScale);
+        else if (instrument === 'babySynth') playBabySynthNote(freq, dur, volumeScale);
+        else if (instrument === 'bass') playBassNote(freq, dur, volumeScale);
       }
 
       function playChord(noteNames, dur, instrument, volumeScale = 1) {
         noteNames.forEach((name, i) => {
-          setTimeout(() => playInstrumentNote(NOTES[name], dur, instrument, volumeScale * 0.75), i * 24);
+          let timer = setTimeout(() => playInstrumentNote(NOTES[name], dur, instrument, volumeScale * 0.75), i * 24);
+          songTimers.push(timer);
         });
+      }
+
+      function trackOsc(o) {
+        activeOscillators.push(o);
+        return o;
       }
 
       function playPianoNote(freq, dur, volumeScale = 1) {
@@ -645,8 +672,8 @@
         env.setADSR(0.001, 0.07, 0.22, 0.22);
         env.setRange(0.45 * volumeScale, 0);
 
-        let s1 = new p5.Oscillator('triangle');
-        let s2 = new p5.Oscillator('sine');
+        let s1 = trackOsc(new p5.Oscillator('triangle'));
+        let s2 = trackOsc(new p5.Oscillator('sine'));
         s1.freq(freq);
         s2.freq(freq * 2.01);
         s1.start();
@@ -654,10 +681,7 @@
         s2.amp(0.10 * volumeScale);
         env.play(s1);
 
-        setTimeout(() => {
-          s1.stop();
-          s2.stop();
-        }, dur + 650);
+        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 650);
       }
 
       function playViolinNote(freq, dur, volumeScale = 1) {
@@ -665,8 +689,8 @@
         env.setADSR(0.12, 0.12, 0.38, 0.28);
         env.setRange(0.28 * volumeScale, 0);
 
-        let s1 = new p5.Oscillator('sawtooth');
-        let s2 = new p5.Oscillator('triangle');
+        let s1 = trackOsc(new p5.Oscillator('sawtooth'));
+        let s2 = trackOsc(new p5.Oscillator('triangle'));
         s1.freq(freq);
         s2.freq(freq * 2.005);
         s1.start();
@@ -674,10 +698,7 @@
         s2.amp(0.055 * volumeScale);
         env.play(s1);
 
-        setTimeout(() => {
-          s1.stop();
-          s2.stop();
-        }, dur + 700);
+        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 700);
       }
 
       function playHarpsichordNote(freq, dur, volumeScale = 1) {
@@ -685,7 +706,7 @@
         env.setADSR(0.001, 0.05, 0.12, 0.12);
         env.setRange(0.34 * volumeScale, 0);
 
-        let s = new p5.Oscillator('square');
+        let s = trackOsc(new p5.Oscillator('square'));
         s.freq(freq);
         s.start();
         env.play(s);
@@ -698,8 +719,8 @@
         env.setADSR(0.06, 0.12, 0.42, 0.35);
         env.setRange(0.32 * volumeScale, 0);
 
-        let s1 = new p5.Oscillator('sawtooth');
-        let s2 = new p5.Oscillator('sawtooth');
+        let s1 = trackOsc(new p5.Oscillator('sawtooth'));
+        let s2 = trackOsc(new p5.Oscillator('sawtooth'));
         s1.freq(freq);
         s2.freq(freq * 1.005);
         s1.start();
@@ -707,10 +728,7 @@
         s2.amp(0.08 * volumeScale);
         env.play(s1);
 
-        setTimeout(() => {
-          s1.stop();
-          s2.stop();
-        }, dur + 650);
+        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 650);
       }
 
       function playPadNote(freq, dur, volumeScale = 1) {
@@ -718,8 +736,8 @@
         env.setADSR(0.22, 0.25, 0.28, 0.75);
         env.setRange(0.25 * volumeScale, 0);
 
-        let s1 = new p5.Oscillator('sine');
-        let s2 = new p5.Oscillator('triangle');
+        let s1 = trackOsc(new p5.Oscillator('sine'));
+        let s2 = trackOsc(new p5.Oscillator('triangle'));
         s1.freq(freq);
         s2.freq(freq * 1.5);
         s1.start();
@@ -727,20 +745,16 @@
         s2.amp(0.08 * volumeScale);
         env.play(s1);
 
-        setTimeout(() => {
-          s1.stop();
-          s2.stop();
-        }, dur + 1200);
+        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 1200);
       }
 
       function playBabySynthNote(freq, dur, volumeScale = 1) {
-        // Baby Shark 內建音色：明亮、可愛、像玩具琴的合成器聲
         let env = new p5.Envelope();
         env.setADSR(0.001, 0.06, 0.18, 0.18);
         env.setRange(0.48 * volumeScale, 0);
 
-        let s1 = new p5.Oscillator('square');
-        let s2 = new p5.Oscillator('triangle');
+        let s1 = trackOsc(new p5.Oscillator('square'));
+        let s2 = trackOsc(new p5.Oscillator('triangle'));
         s1.freq(freq);
         s2.freq(freq * 2.0);
         s1.start();
@@ -748,10 +762,7 @@
         s2.amp(0.08 * volumeScale);
         env.play(s1);
 
-        setTimeout(() => {
-          s1.stop();
-          s2.stop();
-        }, dur + 420);
+        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 420);
       }
 
       function playBassNote(freq, dur, volumeScale = 1) {
@@ -759,7 +770,7 @@
         env.setADSR(0.005, 0.06, 0.25, 0.16);
         env.setRange(0.42 * volumeScale, 0);
 
-        let s = new p5.Oscillator('square');
+        let s = trackOsc(new p5.Oscillator('square'));
         s.freq(freq);
         s.start();
         env.play(s);
@@ -767,6 +778,26 @@
         setTimeout(() => s.stop(), dur + 450);
       }
 
+      // ===== 手指計數 =====
+      function countExtendedFingers(hand) {
+        let count = 0;
+        let kp = hand.keypoints;
+        let palm = kp[9];
+
+        let thumbTip = kp[4];
+        let thumbIp = kp[3];
+        let thumbOpen = dist(thumbTip.x, thumbTip.y, palm.x, palm.y) > dist(thumbIp.x, thumbIp.y, palm.x, palm.y) + 18;
+        if (thumbOpen) count++;
+
+        if (kp[8].y < kp[6].y - 10) count++;
+        if (kp[12].y < kp[10].y - 10) count++;
+        if (kp[16].y < kp[14].y - 10) count++;
+        if (kp[20].y < kp[18].y - 10) count++;
+
+        return constrain(count, 0, 5);
+      }
+
+      // ===== 視覺效果 =====
       function drawEnergyLink(h1, h2, k, gx, gy) {
         let p1x = map(h1.keypoints[9].x, 0, 640, 0, width) + gx;
         let p1y = map(h1.keypoints[9].y, 0, 480, 0, height) + gy;
@@ -778,14 +809,9 @@
         stroke(linkColor);
         beginShape();
         noFill();
-
         for (let t = 0; t <= 1; t += 0.05) {
-          vertex(
-            lerp(p1x, p2x, t) + random(-k * 20, k * 20),
-            lerp(p1y, p2y, t) + random(-k * 20, k * 20)
-          );
+          vertex(lerp(p1x, p2x, t) + random(-k * 20, k * 20), lerp(p1y, p2y, t) + random(-k * 20, k * 20));
         }
-
         endShape();
         fill(255);
         noStroke();
@@ -798,7 +824,7 @@
         let targetY = map(wrist.y, 0, 480, 0, height);
         let angle = atan2(middle.y - wrist.y, middle.x - wrist.x) + 90;
 
-        smoothedAngle[id] = lerp(smoothedAngle[id] || 0, angle, 0.15); 
+        smoothedAngle[id] = lerp(smoothedAngle[id] || 0, angle, 0.15);
         smoothedPos[id].x = lerp(smoothedPos[id].x || targetX, targetX, 0.2);
         smoothedPos[id].y = lerp(smoothedPos[id].y || targetY, targetY, 0.2);
 
@@ -806,7 +832,7 @@
           playTone(1600);
           lastTickAngle[id] = smoothedAngle[id];
         }
-        
+
         push();
         translate(smoothedPos[id].x + gx, smoothedPos[id].y + gy);
         rotate(smoothedAngle[id]);
@@ -814,13 +840,11 @@
         stroke(mainColor);
         strokeWeight(2);
         arc(0, 0, 130, 130, -40, 220);
-
         for (let i = 0; i < 12; i++) {
           rotate(30);
           stroke(mainColor, 100);
           line(50, 0, 58, 0);
         }
-
         fill(255, 50, 80);
         noStroke();
         triangle(75, 0, 65, -5, 65, 5);
@@ -835,11 +859,9 @@
       function checkButtons(x, y) {
         buttons.forEach(btn => {
           let isInside = x > btn.x && x < btn.x + btn.w && y > btn.y && y < btn.y + btn.h;
-
           if (isInside && !btn.active) {
             btn.active = true;
             playTone(1000);
-
             if (btn.label === 'COLOR') {
               colorIdx = (colorIdx + 1) % colors.length;
               mainColor = color(colors[colorIdx]);
@@ -856,10 +878,8 @@
       function drawSciFiSkeleton(hand, gx, gy) {
         stroke(red(mainColor), green(mainColor), blue(mainColor), 80);
         let connections = handPose.getConnections();
-
         for (let i = 0; i < connections.length; i++) {
           let a = connections[i][0], b = connections[i][1];
-
           line(
             map(hand.keypoints[a].x, 0, 640, 0, width) + gx,
             map(hand.keypoints[a].y, 0, 480, 0, height) + gy,
@@ -886,7 +906,6 @@
           noFill();
           stroke(255, 180);
           circle(x, y, 14);
-
           fill(255, 150);
           noStroke();
           textSize(9);
@@ -899,16 +918,13 @@
         buttons.forEach(btn => {
           push();
           translate(btn.x + gx / 3, btn.y + gy / 3);
-
           noFill();
           stroke(mainColor, 150);
           rect(0, 0, btn.w, btn.h, 2);
-
           if (btn.active) {
             fill(red(mainColor), green(mainColor), blue(mainColor), 80);
             rect(0, 0, btn.w, btn.h);
           }
-
           fill(btn.active ? 255 : mainColor);
           textAlign(CENTER, CENTER);
           textSize(11);
@@ -917,12 +933,12 @@
         });
       }
 
-      function drawSongPanel() {
-        let panelW = 900;
-        let panelH = 92;
+      function drawGestureGuide() {
+        let panelW = 930;
+        let panelH = 124;
         let startX = width / 2 - panelW / 2;
-        let startY = height - 112;
-        let cellW = panelW / MAX_FINGER_COUNT;
+        let startY = height - 142;
+        let cellW = panelW / 7;
 
         push();
         noFill();
@@ -933,105 +949,68 @@
         noStroke();
         textAlign(CENTER, CENTER);
         textSize(10);
-        text('FINGER NUMBER MUSIC MODE: show 1 / 2 / 3 / 4 / 5 / 6 fingers and hold briefly to play a full phrase', width / 2, startY - 14);
+        text('SELECT MUSIC: show number 1-6, or make O / OK gesture. Then use control gestures to play, pause, or stop.', width / 2, startY - 14);
 
-        for (let i = 1; i <= MAX_FINGER_COUNT; i++) {
-          let song = fingerSongMap[i];
-          let x = startX + (i - 1) * cellW;
-          let c = song.color;
+        let keys = ['1', '2', '3', '4', '5', '6', 'O'];
+        keys.forEach((key, i) => {
+          let track = tracks[key];
+          let x = startX + i * cellW;
+          let c = track.color;
+          let selected = selectedTrackKey === key;
 
-          stroke(c[0], c[1], c[2], currentSongNumber === i && songPlayingFrames > 0 ? 255 : 140);
-          fill(currentSongNumber === i && songPlayingFrames > 0 ? color(c[0], c[1], c[2], 70) : color(0, 0, 0, 0));
-          rect(x + 6, startY + 8, cellW - 12, panelH - 16, 4);
+          stroke(c[0], c[1], c[2], selected ? 255 : 140);
+          fill(selected ? color(c[0], c[1], c[2], 70) : color(0, 0, 0, 0));
+          rect(x + 6, startY + 8, cellW - 12, 74, 4);
 
           fill(c[0], c[1], c[2], 230);
           noStroke();
           textSize(22);
-          text(i, x + cellW / 2, startY + 26);
+          text(key, x + cellW / 2, startY + 27);
 
           fill(255);
-          textSize(9);
-          text(song.shortTitle, x + cellW / 2, startY + 54);
-
-          fill(255, 160);
           textSize(8);
-          text(song.instrument.toUpperCase(), x + cellW / 2, startY + 72);
-        }
-        pop();
-      }
+          text(track.shortTitle, x + cellW / 2, startY + 55);
 
-      function drawFingerCountHUD() {
-        push();
-        translate(width - 180, 100);
-        noFill();
-        stroke(mainColor, 150);
-        rect(0, 0, 140, 88, 4);
+          fill(255, 155);
+          textSize(8);
+          text(track.instrument.toUpperCase(), x + cellW / 2, startY + 70);
+        });
 
-        fill(mainColor);
-        noStroke();
-        textAlign(CENTER, CENTER);
+        fill(255, 190);
         textSize(10);
-        text('DETECTED COUNT', 70, 18);
-
-        fill(255);
-        textSize(34);
-        text(detectedFingerCount, 70, 52);
-
-        fill(255, 160);
-        textSize(8);
-        text(`STABLE ${countStableFrames}/${COUNT_STABLE_FRAMES}`, 70, 75);
+        text('CONTROL: 2 open hands = PLAY / RESUME     1 fist = PAUSE     2 fists = STOP', width / 2, startY + 102);
         pop();
       }
 
-      function drawNowPlayingHUD() {
-        if (songPlayingFrames <= 0) return;
-
-        let c = currentSongColor;
+      function drawStatusHUD() {
         push();
-        translate(width - 320, 40);
+        translate(width - 330, 40);
+        let c = currentSongColor;
         noFill();
         stroke(c[0], c[1], c[2], 180);
-        rect(0, 0, 280, 48, 4);
-
-        fill(c[0], c[1], c[2], 70);
-        rect(0, 0, 280, 48, 4);
-
-        fill(255);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(10);
-        text('NOW PLAYING', 140, 15);
-        textSize(11);
-        text(currentSongTitle, 140, 33);
-        pop();
-      }
-
-      function drawOKGestureHUD() {
-        push();
-        translate(40, 230);
-        noFill();
-        stroke(okGestureDetected ? color(255, 120, 80) : color(0, 255, 255, 100));
-        rect(0, 0, 160, 58, 4);
-
-        fill(okGestureDetected ? color(255, 120, 80, 90) : color(0, 255, 255, 30));
-        rect(0, 0, 160, 58, 4);
+        rect(0, 0, 290, 128, 4);
+        fill(c[0], c[1], c[2], 60);
+        rect(0, 0, 290, 128, 4);
 
         fill(255);
         noStroke();
         textAlign(CENTER, CENTER);
         textSize(10);
-        text('O / OK GESTURE', 80, 18);
+        text('GESTURE MUSIC CONTROLLER', 145, 16);
 
-        fill(okGestureDetected ? color(255, 255, 255) : color(255, 170));
+        fill(255, 220);
         textSize(9);
-        text(`ROAR MP3 ${okGestureStableFrames}/${OK_GESTURE_STABLE_FRAMES}`, 80, 40);
+        text(`SELECTED: ${selectedTrack.shortTitle}`, 145, 40);
+        text(`STATE: ${playerState.toUpperCase()}`, 145, 60);
+        text(`NOW: ${currentSongTitle}`, 145, 80);
+        text(`COUNT: ${detectedFingerCount}    CONTROL: ${controlCandidate || '-'}`, 145, 100);
+        text(`SELECT STABLE: ${selectionStableFrames}/${SELECTION_STABLE_FRAMES}`, 145, 116);
         pop();
       }
 
       function drawCursor(tx, ty) {
         fill(255);
         circle(tx, ty, 6);
-
         noFill();
         stroke(mainColor);
         circle(tx, ty, 20 + sin(frameCount * 10) * 5);
