@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gesture Music + Totoro Hand Control Final</title>
+    <title>Gesture Music + Totoro Arm Control</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
@@ -73,17 +73,12 @@
       let isReady = false;
       let modelCheckTimer = 0;
 
-      let mainColor;
-      let colors = ['#00ffff', '#ff00ff', '#ffff00'];
-      let colorIdx = 0;
-
       // UI 提示音
       let uiOsc, uiEnv;
 
       // =========================
-      // 圖片角色設定
+      // Avatar 圖片設定
       // =========================
-      // 請把去背好的龍貓圖命名為 totoro_cutout.png
       const AVATAR_IMAGE_FILE = 'totoro_cutout.png';
 
       let avatarImg = null;
@@ -91,45 +86,40 @@
       let avatarLeftPaw = null;
       let avatarRightPaw = null;
 
-      // 從去背龍貓圖中裁出的整隻左手 / 右手
-      // 若你的圖和我假設的位置不同，可再微調
+      // 左手：包含雨傘 + 左手整片（紅線外側）
       const LEFT_ARM_SPRITE = {
-        x: 0.00, y: 0.02, w: 0.38, h: 0.47,
-        pivot:  { x: 0.78, y: 0.76 },
-        handle: { x: 0.55, y: 0.78 }
+        x: 0.00, y: 0.02, w: 0.43, h: 0.58,
+        pivot:  { x: 0.86, y: 0.68 },   // 接身體的位置
+        handle: { x: 0.54, y: 0.58 }    // 手掌/控制點
       };
 
+      // 右手：紅線外側
       const RIGHT_ARM_SPRITE = {
-        x: 0.66, y: 0.22, w: 0.31, h: 0.28,
-        pivot:  { x: 0.02, y: 0.48 },
-        handle: { x: 0.78, y: 0.24 }
+        x: 0.71, y: 0.26, w: 0.25, h: 0.34,
+        pivot:  { x: 0.03, y: 0.38 },
+        handle: { x: 0.63, y: 0.20 }
       };
 
-      // 中央身體裁切
-      const BODY_SPRITE = {
-        x: 0.24, y: 0.12, w: 0.54, h: 0.84
-      };
-
-      // 用橢圓模擬龍貓的圓形身體，讓手臂接點沿著身體邊界滑動
-      const BODY_ELLIPSE = {
-        cx: 0.50,
-        cy: 0.57,
-        rx: 0.23,
-        ry: 0.31
-      };
-
-      // 左右手在身體邊界可滑動的角度範圍
-      const LEFT_ARM_ANGLE_RANGE = {
-        min: 150,
-        max: 238,
-        idle: 205
-      };
-
-      const RIGHT_ARM_ANGLE_RANGE = {
-        min: -58,
-        max: 28,
-        idle: -20
-      };
+      // 固定不動的身體前景輪廓（大致沿著你畫的紅線內側）
+      const BODY_FRONT_PATH = [
+        { x: 0.43, y: 0.16 },
+        { x: 0.40, y: 0.24 },
+        { x: 0.36, y: 0.33 },
+        { x: 0.35, y: 0.40 },
+        { x: 0.33, y: 0.52 },
+        { x: 0.31, y: 0.70 },
+        { x: 0.32, y: 0.88 },
+        { x: 0.41, y: 0.96 },
+        { x: 0.59, y: 0.96 },
+        { x: 0.68, y: 0.88 },
+        { x: 0.70, y: 0.70 },
+        { x: 0.72, y: 0.52 },
+        { x: 0.71, y: 0.40 },
+        { x: 0.68, y: 0.33 },
+        { x: 0.61, y: 0.24 },
+        { x: 0.57, y: 0.16 },
+        { x: 0.50, y: 0.18 }
+      ];
 
       // =========================
       // 音樂系統
@@ -319,11 +309,10 @@
       };
 
       // =========================
-      // p5 setup
+      // setup
       // =========================
       function setup() {
         createCanvas(windowWidth, windowHeight);
-        mainColor = color(colors[colorIdx]);
 
         uiOsc = new p5.Oscillator('sine');
         uiEnv = new p5.Envelope();
@@ -409,7 +398,7 @@
       }
 
       // =========================
-      // 主迴圈
+      // draw
       // =========================
       function draw() {
         background(10, 15, 25);
@@ -434,16 +423,13 @@
           handCounts = hands.map(h => countExtendedFingers(h));
           detectedFingerCount = constrain(handCounts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
 
-          // 先畫 avatar
           drawAvatarHands();
 
-          // 再畫手部骨架
           for (let i = 0; i < hands.length; i++) {
             drawHandSkeleton(hands[i]);
             drawHandTips(hands[i]);
           }
 
-          // 控制手勢優先
           let control = detectControlGesture(hands, handCounts);
           updateControlGesture(control);
 
@@ -560,7 +546,7 @@
         playUITone(1100);
       }
 
-      // 控制手勢
+      // 控制手勢：
       // OK = play/resume
       // 單手拳頭 = pause
       // 雙手拳頭 = stop
@@ -946,7 +932,7 @@
       }
 
       // =========================
-      // Avatar：整隻圖片手臂跟著動
+      // Avatar：只有紅線外側手臂會動
       // =========================
       function drawAvatarHands() {
         let avatarH = min(height * 0.60, height - 250, 660);
@@ -956,16 +942,32 @@
         let avatarX = width / 2 - avatarW / 2;
         let avatarY = 72;
 
-        let body = getBodyEllipseInfo(avatarX, avatarY, avatarW, avatarH);
+        // 手與身體接點：靠近你畫的紅線上端
+        let leftShoulder = {
+          x: avatarX + avatarW * 0.35,
+          y: avatarY + avatarH * 0.40
+        };
 
-        // 閒置位置
-        let leftIdleTarget = pointOnBodyEllipse(body, LEFT_ARM_ANGLE_RANGE.idle, avatarW * 0.10);
-        let rightIdleTarget = pointOnBodyEllipse(body, RIGHT_ARM_ANGLE_RANGE.idle, avatarW * 0.10);
+        let rightShoulder = {
+          x: avatarX + avatarW * 0.71,
+          y: avatarY + avatarH * 0.40
+        };
 
-        let leftRawTarget = { ...leftIdleTarget };
-        let rightRawTarget = { ...rightIdleTarget };
+        // 沒有偵測到手時，回到原圖附近位置
+        let leftRest = {
+          x: avatarX + avatarW * 0.22,
+          y: avatarY + avatarH * 0.34
+        };
 
-        // 使用者左右手位置
+        let rightRest = {
+          x: avatarX + avatarW * 0.84,
+          y: avatarY + avatarH * 0.34
+        };
+
+        let leftTarget = { ...leftRest };
+        let rightTarget = { ...rightRest };
+
+        // 左右手追蹤
         if (hands && hands.length > 0) {
           hands.forEach(hand => {
             let palm = hand.keypoints[9] || hand.keypoints[0];
@@ -973,108 +975,39 @@
             let ty = map(palm.y, 0, 480, 0, height);
 
             if (tx < width / 2) {
-              leftRawTarget = { x: tx, y: ty };
+              leftTarget = { x: tx, y: ty };
             } else {
-              rightRawTarget = { x: tx, y: ty };
+              rightTarget = { x: tx, y: ty };
             }
           });
         }
 
-        // 先依方向取得接點
-        let leftShoulder = getRoundedBodyAnchor(body, 'left', leftRawTarget);
-        let rightShoulder = getRoundedBodyAnchor(body, 'right', rightRawTarget);
+        // 限制長度
+        leftTarget = limitArmReach(leftShoulder, leftTarget, avatarW * 0.42);
+        rightTarget = limitArmReach(rightShoulder, rightTarget, avatarW * 0.42);
 
-        // 限制手臂最長距離
-        let leftTarget = limitArmReach(leftShoulder, leftRawTarget, avatarW * 0.42);
-        let rightTarget = limitArmReach(rightShoulder, rightRawTarget, avatarW * 0.42);
+        // 平滑
+        if (!avatarLeftPaw) avatarLeftPaw = { x: leftRest.x, y: leftRest.y };
+        if (!avatarRightPaw) avatarRightPaw = { x: rightRest.x, y: rightRest.y };
 
-        // 重新依限制後的方向再算接點
-        leftShoulder = getRoundedBodyAnchor(body, 'left', leftTarget);
-        rightShoulder = getRoundedBodyAnchor(body, 'right', rightTarget);
+        avatarLeftPaw.x = lerp(avatarLeftPaw.x, leftTarget.x, 0.20);
+        avatarLeftPaw.y = lerp(avatarLeftPaw.y, leftTarget.y, 0.20);
 
-        if (!avatarLeftPaw) avatarLeftPaw = { x: leftTarget.x, y: leftTarget.y };
-        if (!avatarRightPaw) avatarRightPaw = { x: rightTarget.x, y: rightTarget.y };
-
-        avatarLeftPaw.x = lerp(avatarLeftPaw.x, leftTarget.x, 0.22);
-        avatarLeftPaw.y = lerp(avatarLeftPaw.y, leftTarget.y, 0.22);
-
-        avatarRightPaw.x = lerp(avatarRightPaw.x, rightTarget.x, 0.22);
-        avatarRightPaw.y = lerp(avatarRightPaw.y, rightTarget.y, 0.22);
-
-        // 用平滑後位置重算一次接點
-        leftShoulder = getRoundedBodyAnchor(body, 'left', avatarLeftPaw);
-        rightShoulder = getRoundedBodyAnchor(body, 'right', avatarRightPaw);
+        avatarRightPaw.x = lerp(avatarRightPaw.x, rightTarget.x, 0.20);
+        avatarRightPaw.y = lerp(avatarRightPaw.y, rightTarget.y, 0.20);
 
         if (avatarReady) {
-          // 先畫整隻手臂（在後面）
+          // 先畫紅線外側左右手
           drawArmSprite(avatarImg, LEFT_ARM_SPRITE, leftShoulder, avatarLeftPaw, avatarW, avatarH);
           drawArmSprite(avatarImg, RIGHT_ARM_SPRITE, rightShoulder, avatarRightPaw, avatarW, avatarH);
 
-          // 再畫身體（蓋住接縫）
-          drawBodySprite(avatarImg, BODY_SPRITE, avatarX, avatarY, avatarW, avatarH);
+          // 再畫身體前景，蓋住內部接縫
+          drawFrontBodyMask(avatarImg, avatarX, avatarY, avatarW, avatarH);
         } else {
           drawAvatarPlaceholder(avatarX, avatarY, avatarW, avatarH);
         }
 
         drawAvatarLinkHUD(avatarX, avatarY, avatarW);
-      }
-
-      function getBodyEllipseInfo(avatarX, avatarY, avatarW, avatarH) {
-        return {
-          cx: avatarX + avatarW * BODY_ELLIPSE.cx,
-          cy: avatarY + avatarH * BODY_ELLIPSE.cy,
-          rx: avatarW * BODY_ELLIPSE.rx,
-          ry: avatarH * BODY_ELLIPSE.ry
-        };
-      }
-
-      function normalizeAngleDeg(a) {
-        while (a > 180) a -= 360;
-        while (a < -180) a += 360;
-        return a;
-      }
-
-      function clampAngleDeg(a, minA, maxA) {
-        a = normalizeAngleDeg(a);
-        return constrain(a, minA, maxA);
-      }
-
-      function pointOnBodyEllipse(body, angleDeg, outwardOffset = 0) {
-        let x = body.cx + body.rx * cos(angleDeg);
-        let y = body.cy + body.ry * sin(angleDeg);
-
-        let dx = x - body.cx;
-        let dy = y - body.cy;
-        let len = max(1, sqrt(dx * dx + dy * dy));
-
-        return {
-          x: x + (dx / len) * outwardOffset,
-          y: y + (dy / len) * outwardOffset
-        };
-      }
-
-      function getRoundedBodyAnchor(body, side, target) {
-        let angle = atan2(target.y - body.cy, target.x - body.cx);
-
-        if (side === 'left') {
-          angle = clampAngleDeg(angle, LEFT_ARM_ANGLE_RANGE.min, LEFT_ARM_ANGLE_RANGE.max);
-        } else {
-          angle = clampAngleDeg(angle, RIGHT_ARM_ANGLE_RANGE.min, RIGHT_ARM_ANGLE_RANGE.max);
-        }
-
-        let x = body.cx + body.rx * cos(angle);
-        let y = body.cy + body.ry * sin(angle);
-
-        // 稍微埋進身體裡，讓接縫更自然
-        let dx = x - body.cx;
-        let dy = y - body.cy;
-        let len = max(1, sqrt(dx * dx + dy * dy));
-
-        let inset = 8;
-        return {
-          x: x - (dx / len) * inset,
-          y: y - (dy / len) * inset
-        };
       }
 
       function limitArmReach(shoulder, target, maxLen) {
@@ -1093,21 +1026,6 @@
         return target;
       }
 
-      function drawBodySprite(imgRef, crop, avatarX, avatarY, avatarW, avatarH) {
-        let sx = imgRef.width * crop.x;
-        let sy = imgRef.height * crop.y;
-        let sw = imgRef.width * crop.w;
-        let sh = imgRef.height * crop.h;
-
-        let dx = avatarX + avatarW * crop.x;
-        let dy = avatarY + avatarH * crop.y;
-        let dw = avatarW * crop.w;
-        let dh = avatarH * crop.h;
-
-        imageMode(CORNER);
-        image(imgRef, dx, dy, dw, dh, sx, sy, sw, sh);
-      }
-
       function drawArmSprite(imgRef, crop, shoulder, paw, avatarW, avatarH) {
         let sx = imgRef.width * crop.x;
         let sy = imgRef.height * crop.y;
@@ -1123,16 +1041,16 @@
         let handleX = crop.handle.x * drawW;
         let handleY = crop.handle.y * drawH;
 
-        // 原始裁圖中，手臂的方向
+        // 原裁圖方向
         let sourceAngle = atan2(handleY - pivotY, handleX - pivotX);
 
-        // 目前目標方向
+        // 目標方向
         let targetAngle = atan2(paw.y - shoulder.y, paw.x - shoulder.x);
         let rotateDelta = targetAngle - sourceAngle;
 
         let sourceLen = dist(pivotX, pivotY, handleX, handleY);
         let targetLen = dist(shoulder.x, shoulder.y, paw.x, paw.y);
-        let stretch = constrain(targetLen / max(sourceLen, 1), 0.80, 1.25);
+        let stretch = constrain(targetLen / max(sourceLen, 1), 0.82, 1.22);
 
         push();
         imageMode(CORNER);
@@ -1140,15 +1058,45 @@
         rotate(rotateDelta);
         scale(stretch, stretch);
 
-        // 讓裁圖裡的 pivot 對齊身體接點
         image(imgRef, -pivotX, -pivotY, drawW, drawH, sx, sy, sw, sh);
         pop();
 
-        // 控制點提示圈（不是手）
+        // 控制提示圈（不是手）
         noFill();
-        stroke(0, 255, 255, 120);
+        stroke(0, 255, 255, 100);
         strokeWeight(2);
-        circle(paw.x, paw.y, 48 + sin(frameCount * 8) * 3);
+        circle(paw.x, paw.y, 46 + sin(frameCount * 8) * 3);
+      }
+
+      function drawFrontBodyMask(imgRef, avatarX, avatarY, avatarW, avatarH) {
+        push();
+
+        drawingContext.save();
+        drawingContext.beginPath();
+
+        let pts = BODY_FRONT_PATH;
+        let first = pts[0];
+        drawingContext.moveTo(
+          avatarX + avatarW * first.x,
+          avatarY + avatarH * first.y
+        );
+
+        for (let i = 1; i < pts.length; i++) {
+          let p = pts[i];
+          drawingContext.lineTo(
+            avatarX + avatarW * p.x,
+            avatarY + avatarH * p.y
+          );
+        }
+
+        drawingContext.closePath();
+        drawingContext.clip();
+
+        imageMode(CORNER);
+        image(imgRef, avatarX, avatarY, avatarW, avatarH);
+
+        drawingContext.restore();
+        pop();
       }
 
       function drawAvatarPlaceholder(x, y, w, h) {
@@ -1176,17 +1124,17 @@
 
       function drawAvatarLinkHUD(x, y, w) {
         push();
-        translate(x + w / 2 - 150, y - 42);
+        translate(x + w / 2 - 155, y - 42);
         noFill();
         stroke(0, 255, 255, 160);
-        rect(0, 0, 300, 32, 4);
+        rect(0, 0, 310, 32, 4);
         fill(0, 255, 255, 45);
-        rect(0, 0, 300, 32, 4);
+        rect(0, 0, 310, 32, 4);
         fill(255);
         noStroke();
         textAlign(CENTER, CENTER);
         textSize(10);
-        text('IMAGE ARM SPRITE LINK ACTIVE', 150, 16);
+        text('RED-LINE OUTER ARMS LINK ACTIVE', 155, 16);
         pop();
       }
 
@@ -1239,13 +1187,13 @@
         fill(255);
         textAlign(CENTER, CENTER);
         textSize(18);
-        text('Gesture Music + Totoro Hand Control', width / 2, 24);
+        text('Gesture Music + Totoro Red-Line Arm Control', width / 2, 24);
         pop();
       }
 
       function drawGuideHUD() {
-        let panelW = min(1100, width - 40);
-        let panelH = 132;
+        let panelW = min(1120, width - 40);
+        let panelH = 136;
         let x = width / 2 - panelW / 2;
         let y = height - panelH - 18;
 
@@ -1263,7 +1211,7 @@
 
         text('選曲：數字 1~6 | O 手勢 = Roar.mp3', x + panelW/2, y + 18);
         text('播放控制：OK 手勢 = 播放 / 繼續 | 單手握拳 = 暫停 | 雙手握拳 = 停止', x + panelW/2, y + 38);
-        text('角色互動：左手控制左手，右手控制右手；手臂接點會沿著圓形身體邊界滑動', x + panelW/2, y + 58);
+        text('圖片控制：只移動紅線外側左右手臂；紅線內側身體固定不動', x + panelW/2, y + 58);
 
         const keys = ['1','2','3','4','5','6','O'];
         const cellW = panelW / keys.length;
@@ -1275,16 +1223,16 @@
 
           stroke(c[0], c[1], c[2], selected ? 255 : 130);
           fill(selected ? color(c[0], c[1], c[2], 60) : color(0,0,0,0));
-          rect(x + i * cellW + 6, y + 74, cellW - 12, 46, 4);
+          rect(x + i * cellW + 6, y + 76, cellW - 12, 48, 4);
 
           fill(c[0], c[1], c[2], 255);
           noStroke();
           textSize(16);
-          text(key, x + i * cellW + cellW / 2, y + 90);
+          text(key, x + i * cellW + cellW / 2, y + 92);
 
           fill(255);
           textSize(8);
-          text(tr.shortTitle, x + i * cellW + cellW / 2, y + 108);
+          text(tr.shortTitle, x + i * cellW + cellW / 2, y + 111);
         });
 
         pop();
