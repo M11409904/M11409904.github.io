@@ -241,10 +241,21 @@
       let currentSongTimers = [];
       let songPlayingFrames = 0;
 
+      // ===== 比 O / OK 手勢播放本機 MP3 =====
+      // 請把音檔放在 html 同一個資料夾，檔名必須完全相同：Katy Perry - Roar.mp3
+      let roarSound = null;
+      let roarLoadStarted = false;
+      let okGestureDetected = false;
+      let okGestureStableFrames = 0;
+      let okGestureActive = false;
+      let lastOKTriggerFrame = -999;
+
 
       const COUNT_STABLE_FRAMES = 22;
       const SONG_TRIGGER_COOLDOWN_FRAMES = 90;
       const MAX_FINGER_COUNT = 6;
+      const OK_GESTURE_STABLE_FRAMES = 18;
+      const OK_GESTURE_COOLDOWN_FRAMES = 150;
 
       let buttons = [
         { label: 'COLOR', x: 40, y: 120, w: 90, h: 40, active: false },
@@ -283,6 +294,7 @@
         // 瀏覽器規定音效必須由使用者點擊後啟動
         userStartAudio();
         playBootSound();
+        loadRoarSound();
 
         video = createCapture(VIDEO, () => {
           document.getElementById('overlay').style.display = 'none';
@@ -354,8 +366,13 @@
             drawCursor(tx, ty);
           }
 
+          // 比 O / OK 手勢會優先觸發 Roar.mp3，避免同時被誤判成數字手勢
+          updateOKGestureTrigger(hands);
+
           // 使用雙手合計判斷 1 到 6；例如一手 5 根 + 另一手 1 根 = 6
-          updateFingerCountTrigger(hands);
+          if (!okGestureDetected) {
+            updateFingerCountTrigger(hands);
+          }
 
           if (hands.length === 2) {
             let d = dist(
@@ -379,6 +396,9 @@
           countCandidate = 0;
           countStableFrames = 0;
           lastTriggeredCount = 0;
+          okGestureDetected = false;
+          okGestureStableFrames = 0;
+          okGestureActive = false;
           drawScanningUI();
         }
 
@@ -386,8 +406,89 @@
         drawSongPanel();
         drawFingerCountHUD();
         drawNowPlayingHUD();
+        drawOKGestureHUD();
 
         if (songPlayingFrames > 0) songPlayingFrames--;
+      }
+
+      // ===== 比 O / OK 手勢：播放 Katy Perry - Roar.mp3 =====
+      function loadRoarSound() {
+        if (roarLoadStarted || roarSound) return;
+
+        roarLoadStarted = true;
+
+        roarSound = loadSound(
+          'Katy Perry - Roar.mp3',
+          () => {
+            updateLog('ROAR MP3 READY');
+          },
+          () => {
+            roarSound = null;
+            updateLog('ROAR MP3 NOT FOUND');
+          }
+        );
+      }
+
+      function updateOKGestureTrigger(activeHands) {
+        okGestureDetected = false;
+
+        for (let i = 0; i < activeHands.length; i++) {
+          if (isOKGesture(activeHands[i])) {
+            okGestureDetected = true;
+            break;
+          }
+        }
+
+        if (okGestureDetected) {
+          okGestureStableFrames++;
+        } else {
+          okGestureStableFrames = 0;
+          okGestureActive = false;
+          return;
+        }
+
+        let stable = okGestureStableFrames > OK_GESTURE_STABLE_FRAMES;
+        let cooledDown = frameCount - lastOKTriggerFrame > OK_GESTURE_COOLDOWN_FRAMES;
+
+        if (stable && !okGestureActive && cooledDown) {
+          playRoarSong();
+          okGestureActive = true;
+          lastOKTriggerFrame = frameCount;
+        }
+      }
+
+      function isOKGesture(hand) {
+        let kp = hand.keypoints;
+        let thumbTip = kp[4];
+        let indexTip = kp[8];
+        let wrist = kp[0];
+        let palm = kp[9];
+
+        let handScale = dist(wrist.x, wrist.y, palm.x, palm.y);
+        let thumbIndexDistance = dist(thumbTip.x, thumbTip.y, indexTip.x, indexTip.y);
+        let okThreshold = max(22, handScale * 0.42);
+
+        // 拇指尖與食指尖靠近，視為比 O / OK。
+        return thumbIndexDistance < okThreshold;
+      }
+
+      function playRoarSong() {
+        stopScheduledSong();
+
+        currentSongNumber = 0;
+        currentSongTitle = 'O - Katy Perry / Roar.mp3';
+        currentSongColor = [255, 120, 80];
+        songPlayingFrames = 360;
+
+        if (roarSound && roarSound.isLoaded()) {
+          roarSound.stop();
+          roarSound.setVolume(0.9);
+          roarSound.play();
+          updateLog('OK GESTURE: PLAYING ROAR.MP3');
+        } else {
+          updateLog('OK GESTURE DETECTED - ROAR.MP3 NOT READY');
+          playTone(220);
+        }
       }
 
       // ===== 判斷伸出幾根手指 =====
@@ -465,6 +566,10 @@
       function stopScheduledSong() {
         currentSongTimers.forEach(timer => clearTimeout(timer));
         currentSongTimers = [];
+
+        if (roarSound && roarSound.isPlaying && roarSound.isPlaying()) {
+          roarSound.stop();
+        }
       }
 
       function playSong(song) {
@@ -898,6 +1003,28 @@
         text('NOW PLAYING', 140, 15);
         textSize(11);
         text(currentSongTitle, 140, 33);
+        pop();
+      }
+
+      function drawOKGestureHUD() {
+        push();
+        translate(40, 230);
+        noFill();
+        stroke(okGestureDetected ? color(255, 120, 80) : color(0, 255, 255, 100));
+        rect(0, 0, 160, 58, 4);
+
+        fill(okGestureDetected ? color(255, 120, 80, 90) : color(0, 255, 255, 30));
+        rect(0, 0, 160, 58, 4);
+
+        fill(255);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textSize(10);
+        text('O / OK GESTURE', 80, 18);
+
+        fill(okGestureDetected ? color(255, 255, 255) : color(255, 170));
+        textSize(9);
+        text(`ROAR MP3 ${okGestureStableFrames}/${OK_GESTURE_STABLE_FRAMES}`, 80, 40);
         pop();
       }
 
