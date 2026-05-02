@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sci-Fi Hand Tracking - Mozart Finger Music</title>
+    <title>Sci-Fi Hand Tracking - Finger Number Music</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
@@ -114,64 +114,115 @@
       let glitchTimer = 0, osc, envelope, linkOsc;
       let modelCheckTimer = 0;
 
-      // ===== 五指觸發一段樂曲 =====
-      // 說明：這是用 p5.sound 合成器做的「莫札特 K.545 風格簡化鋼琴樂句」，不是錄音檔。
-      // 食指會觸發最像鋼琴主旋律的一段，其它手指可觸發變奏、低音、和弦與鐘琴版本。
+      // ===== 手指數字觸發整段音樂 =====
+      // 使用方式：伸出 1 到 5 根手指，維持一下，就會觸發對應樂曲。
+      // 這裡用 p5.sound 合成器即時演奏，不需要 mp3 / wav 檔案。
+
       const NOTES = {
-        C2: 65.41, D2: 73.42, E2: 82.41, F2: 87.31, G2: 98.00, A2: 110.00, B2: 123.47,
-        C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, B3: 246.94,
-        C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88,
-        C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00, B5: 987.77,
-        C6: 1046.50, D6: 1174.66, E6: 1318.51, F6: 1396.91, G6: 1567.98
+        C2: 65.41, Cs2: 69.30, D2: 73.42, Ds2: 77.78, E2: 82.41, F2: 87.31, Fs2: 92.50, G2: 98.00, Gs2: 103.83, A2: 110.00, As2: 116.54, B2: 123.47,
+        C3: 130.81, Cs3: 138.59, D3: 146.83, Ds3: 155.56, E3: 164.81, F3: 174.61, Fs3: 185.00, G3: 196.00, Gs3: 207.65, A3: 220.00, As3: 233.08, B3: 246.94,
+        C4: 261.63, Cs4: 277.18, D4: 293.66, Ds4: 311.13, E4: 329.63, F4: 349.23, Fs4: 369.99, G4: 392.00, Gs4: 415.30, A4: 440.00, As4: 466.16, B4: 493.88,
+        C5: 523.25, Cs5: 554.37, D5: 587.33, Ds5: 622.25, E5: 659.25, F5: 698.46, Fs5: 739.99, G5: 783.99, Gs5: 830.61, A5: 880.00, As5: 932.33, B5: 987.77,
+        C6: 1046.50, Cs6: 1108.73, D6: 1174.66, Ds6: 1244.51, E6: 1318.51, F6: 1396.91, Fs6: 1479.98, G6: 1567.98, A6: 1760.00
       };
 
-      const MOZART_K545_PIANO = [
-        { n: 'C5', d: 180 }, { n: 'E5', d: 180 }, { n: 'G5', d: 180 }, { n: 'C6', d: 260 },
-        { n: 'B5', d: 180 }, { n: 'G5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 260 },
-        { n: 'D5', d: 180 }, { n: 'F5', d: 180 }, { n: 'A5', d: 180 }, { n: 'D6', d: 260 },
-        { n: 'C6', d: 180 }, { n: 'A5', d: 180 }, { n: 'F5', d: 180 }, { n: 'D5', d: 260 },
-        { n: 'G4', d: 180 }, { n: 'B4', d: 180 }, { n: 'D5', d: 180 }, { n: 'G5', d: 260 },
-        { n: 'E5', d: 180 }, { n: 'G5', d: 180 }, { n: 'C6', d: 180 }, { n: 'E6', d: 420 }
-      ];
+      const fingerSongMap = {
+        1: {
+          title: '1 - Mozart / Eine kleine Nachtmusik',
+          shortTitle: 'MOZART VIOLIN',
+          instrument: 'violin',
+          color: [255, 90, 140],
+          tempo: 1.0,
+          melody: [
+            { n: 'G4', d: 220 }, { n: 'D4', d: 220 }, { n: 'G4', d: 220 }, { n: 'B4', d: 220 }, { n: 'D5', d: 440 }, { n: 'B4', d: 220 }, { n: 'G4', d: 440 },
+            { n: 'D5', d: 220 }, { n: 'B4', d: 220 }, { n: 'D5', d: 220 }, { n: 'G5', d: 220 }, { n: 'Fs5', d: 300 }, { n: 'E5', d: 140 }, { n: 'D5', d: 440 },
+            { n: 'E5', d: 220 }, { n: 'C5', d: 220 }, { n: 'E5', d: 220 }, { n: 'G5', d: 220 }, { n: 'Fs5', d: 300 }, { n: 'E5', d: 140 }, { n: 'D5', d: 440 },
+            { n: 'B4', d: 220 }, { n: 'G4', d: 220 }, { n: 'A4', d: 220 }, { n: 'Fs4', d: 220 }, { n: 'G4', d: 700 }
+          ],
+          bass: [
+            { n: 'G3', d: 440 }, { n: 'D3', d: 440 }, { n: 'G3', d: 440 }, { n: 'D3', d: 440 },
+            { n: 'C3', d: 440 }, { n: 'D3', d: 440 }, { n: 'G2', d: 880 }
+          ]
+        },
+        2: {
+          title: '2 - Beethoven / Fur Elise',
+          shortTitle: 'BEETHOVEN PIANO',
+          instrument: 'piano',
+          color: [120, 220, 255],
+          tempo: 1.0,
+          melody: [
+            { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'B4', d: 160 }, { n: 'D5', d: 160 }, { n: 'C5', d: 160 }, { n: 'A4', d: 420 },
+            { n: 'C4', d: 160 }, { n: 'E4', d: 160 }, { n: 'A4', d: 160 }, { n: 'B4', d: 420 },
+            { n: 'E4', d: 160 }, { n: 'Gs4', d: 160 }, { n: 'B4', d: 160 }, { n: 'C5', d: 420 },
+            { n: 'E4', d: 160 }, { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'B4', d: 160 }, { n: 'D5', d: 160 }, { n: 'C5', d: 160 }, { n: 'A4', d: 520 }
+          ],
+          bass: [
+            { n: 'A2', d: 640 }, { n: 'E3', d: 640 }, { n: 'A2', d: 640 }, { n: 'E3', d: 640 }, { n: 'A2', d: 880 }
+          ]
+        },
+        3: {
+          title: '3 - Bach / Minuet in G',
+          shortTitle: 'BACH HARPSICHORD',
+          instrument: 'harpsichord',
+          color: [255, 255, 140],
+          tempo: 0.95,
+          melody: [
+            { n: 'G4', d: 220 }, { n: 'D5', d: 220 }, { n: 'B4', d: 220 }, { n: 'C5', d: 220 }, { n: 'D5', d: 440 }, { n: 'G4', d: 220 }, { n: 'G4', d: 220 },
+            { n: 'E5', d: 220 }, { n: 'C5', d: 220 }, { n: 'D5', d: 220 }, { n: 'E5', d: 220 }, { n: 'Fs5', d: 440 }, { n: 'G5', d: 220 }, { n: 'G4', d: 220 },
+            { n: 'C5', d: 220 }, { n: 'D5', d: 220 }, { n: 'C5', d: 220 }, { n: 'B4', d: 220 }, { n: 'A4', d: 440 }, { n: 'B4', d: 220 }, { n: 'C5', d: 220 },
+            { n: 'B4', d: 220 }, { n: 'A4', d: 220 }, { n: 'G4', d: 660 }
+          ],
+          bass: [
+            { n: 'G3', d: 660 }, { n: 'D3', d: 660 }, { n: 'C3', d: 660 }, { n: 'D3', d: 660 }, { n: 'G2', d: 660 }
+          ]
+        },
+        4: {
+          title: '4 - Vivaldi / Spring',
+          shortTitle: 'VIVALDI STRINGS',
+          instrument: 'strings',
+          color: [150, 255, 160],
+          tempo: 0.82,
+          melody: [
+            { n: 'E5', d: 180 }, { n: 'E5', d: 180 }, { n: 'E5', d: 180 }, { n: 'D5', d: 180 }, { n: 'C5', d: 360 }, { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 360 },
+            { n: 'G5', d: 180 }, { n: 'G5', d: 180 }, { n: 'G5', d: 180 }, { n: 'F5', d: 180 }, { n: 'E5', d: 360 }, { n: 'D5', d: 180 }, { n: 'C5', d: 180 }, { n: 'B4', d: 360 },
+            { n: 'C5', d: 180 }, { n: 'E5', d: 180 }, { n: 'G5', d: 180 }, { n: 'C6', d: 180 }, { n: 'B5', d: 180 }, { n: 'A5', d: 180 }, { n: 'G5', d: 360 },
+            { n: 'E5', d: 180 }, { n: 'D5', d: 180 }, { n: 'C5', d: 600 }
+          ],
+          bass: [
+            { n: 'C3', d: 720 }, { n: 'G2', d: 720 }, { n: 'C3', d: 720 }, { n: 'G2', d: 720 }, { n: 'C3', d: 720 }
+          ]
+        },
+        5: {
+          title: '5 - Pachelbel / Canon in D',
+          shortTitle: 'CANON ORCHESTRA',
+          instrument: 'pad',
+          color: [220, 160, 255],
+          tempo: 1.05,
+          melody: [
+            { chord: ['D4', 'Fs4', 'A4'], d: 520 }, { chord: ['A3', 'Cs4', 'E4'], d: 520 }, { chord: ['B3', 'D4', 'Fs4'], d: 520 }, { chord: ['Fs3', 'A3', 'Cs4'], d: 520 },
+            { chord: ['G3', 'B3', 'D4'], d: 520 }, { chord: ['D3', 'Fs3', 'A3'], d: 520 }, { chord: ['G3', 'B3', 'D4'], d: 520 }, { chord: ['A3', 'Cs4', 'E4'], d: 520 },
+            { n: 'Fs4', d: 180 }, { n: 'E4', d: 180 }, { n: 'D4', d: 180 }, { n: 'Cs4', d: 180 }, { n: 'B3', d: 180 }, { n: 'A3', d: 180 }, { n: 'B3', d: 180 }, { n: 'Cs4', d: 180 }, { n: 'D4', d: 700 }
+          ],
+          bass: [
+            { n: 'D2', d: 520 }, { n: 'A2', d: 520 }, { n: 'B2', d: 520 }, { n: 'Fs2', d: 520 },
+            { n: 'G2', d: 520 }, { n: 'D2', d: 520 }, { n: 'G2', d: 520 }, { n: 'A2', d: 520 }
+          ]
+        }
+      };
 
-      const MOZART_VARIATION = [
-        { n: 'E5', d: 140 }, { n: 'G5', d: 140 }, { n: 'C6', d: 220 }, { n: 'G5', d: 140 },
-        { n: 'F5', d: 140 }, { n: 'A5', d: 140 }, { n: 'D6', d: 220 }, { n: 'A5', d: 140 },
-        { n: 'G5', d: 140 }, { n: 'B5', d: 140 }, { n: 'D6', d: 220 }, { n: 'B5', d: 140 },
-        { n: 'C6', d: 180 }, { n: 'G5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 360 }
-      ];
+      let detectedFingerCount = 0;
+      let countCandidate = 0;
+      let countStableFrames = 0;
+      let lastTriggeredCount = 0;
+      let lastSongTriggerFrame = -999;
+      let currentSongNumber = 0;
+      let currentSongTitle = '';
+      let currentSongColor = [0, 255, 255];
+      let currentSongTimers = [];
+      let songPlayingFrames = 0;
 
-      const MOZART_BASS = [
-        { n: 'C3', d: 320 }, { n: 'G3', d: 320 }, { n: 'C3', d: 320 }, { n: 'G3', d: 320 },
-        { n: 'D3', d: 320 }, { n: 'A3', d: 320 }, { n: 'D3', d: 320 }, { n: 'A3', d: 320 },
-        { n: 'G2', d: 320 }, { n: 'D3', d: 320 }, { n: 'G2', d: 320 }, { n: 'D3', d: 320 },
-        { n: 'C3', d: 640 }
-      ];
-
-      const MOZART_CHORDS = [
-        { chord: ['C4', 'E4', 'G4'], d: 700 },
-        { chord: ['D4', 'F4', 'A4'], d: 700 },
-        { chord: ['G3', 'B3', 'D4'], d: 700 },
-        { chord: ['C4', 'E4', 'G4', 'C5'], d: 900 }
-      ];
-
-      const fingerInstruments = [
-        { idx: 4,  finger: 'THUMB',  instrument: 'VIOLIN PHRASE', mode: 'violin', phrase: MOZART_VARIATION, color: [255, 90, 140] },
-        { idx: 8,  finger: 'INDEX',  instrument: 'MOZART PIANO',  mode: 'piano',  phrase: MOZART_K545_PIANO, color: [120, 220, 255] },
-        { idx: 12, finger: 'MIDDLE', instrument: 'BELL MELODY',   mode: 'bell',   phrase: MOZART_K545_PIANO, color: [255, 255, 140] },
-        { idx: 16, finger: 'RING',   instrument: 'BASS LINE',     mode: 'bass',   phrase: MOZART_BASS, color: [150, 255, 160] },
-        { idx: 20, finger: 'PINKY',  instrument: 'PIANO CHORDS',  mode: 'chord',  phrase: MOZART_CHORDS, color: [220, 160, 255] }
-      ];
-
-      let lastFingerY = {};
-      let lastFingerTriggerFrame = {};
-      let activeFingerFX = [];
-      let musicActiveFrames = 0;
-      let currentMusicLabel = '';
-
-      // 觸發設定：數字越小越敏感，越大越不容易誤觸
-      const FINGER_TAP_SPEED = 22;
-      const PHRASE_COOLDOWN_FRAMES = 90;
+      const COUNT_STABLE_FRAMES = 22;
+      const SONG_TRIGGER_COOLDOWN_FRAMES = 90;
 
       let buttons = [
         { label: 'COLOR', x: 40, y: 120, w: 90, h: 40, active: false },
@@ -245,167 +296,10 @@
         }, 50);
       }
 
-      // ===== 手指快速往下點一下：播放一整段樂句 =====
-      function checkFingerInstrumentTriggers(hand, handId, gx, gy) {
-        fingerInstruments.forEach(item => {
-          let tip = hand.keypoints[item.idx];
-          let x = map(tip.x, 0, 640, 0, width) + gx;
-          let y = map(tip.y, 0, 480, 0, height) + gy;
-          let key = `${handId}_${item.idx}`;
-
-          if (lastFingerY[key] === undefined) {
-            lastFingerY[key] = y;
-            lastFingerTriggerFrame[key] = -999;
-            return;
-          }
-
-          let dy = y - lastFingerY[key];
-          let cooledDown = frameCount - lastFingerTriggerFrame[key] > PHRASE_COOLDOWN_FRAMES;
-
-          if (dy > FINGER_TAP_SPEED && cooledDown) {
-            triggerFingerPhrase(item, x, y);
-            lastFingerTriggerFrame[key] = frameCount;
-          }
-
-          lastFingerY[key] = y;
-        });
-      }
-
-      function triggerFingerPhrase(item, x, y) {
-        musicActiveFrames = 180;
-        currentMusicLabel = `${item.finger}: ${item.instrument}`;
-        updateLog(`${item.finger} PLAYING ${item.instrument}`);
-
-        playPhrase(item);
-
-        activeFingerFX.push({
-          x,
-          y,
-          label: item.instrument,
-          color: item.color,
-          life: 50,
-          maxLife: 50
-        });
-      }
-
-      function playPhrase(item) {
-        let startTime = 0;
-
-        item.phrase.forEach(step => {
-          let delayTime = startTime;
-
-          setTimeout(() => {
-            if (step.n) {
-              let freq = NOTES[step.n];
-              if (item.mode === 'piano') playPianoNote(freq, step.d);
-              else if (item.mode === 'violin') playViolinNote(freq, step.d);
-              else if (item.mode === 'bell') playBellNote(freq, step.d);
-              else if (item.mode === 'bass') playBassNote(freq, step.d);
-            }
-
-            if (step.chord) {
-              playPianoChord(step.chord, step.d);
-            }
-          }, delayTime);
-
-          startTime += step.d;
-        });
-      }
-
-      function playPianoNote(freq, dur) {
-        // 鋼琴感：短促、明亮、帶一點泛音
-        let env = new p5.Envelope();
-        env.setADSR(0.001, 0.08, 0.22, 0.25);
-        env.setRange(0.48, 0);
-
-        let s1 = new p5.Oscillator('triangle');
-        let s2 = new p5.Oscillator('sine');
-        s1.freq(freq);
-        s2.freq(freq * 2.01);
-        s1.start();
-        s2.start();
-        s2.amp(0.11);
-        env.play(s1);
-
-        setTimeout(() => {
-          s1.stop();
-          s2.stop();
-        }, dur + 650);
-      }
-
-      function playPianoChord(noteNames, dur) {
-        noteNames.forEach((name, i) => {
-          setTimeout(() => playPianoNote(NOTES[name], dur), i * 28);
-        });
-      }
-
-      function playViolinNote(freq, dur) {
-        // 小提琴感：慢慢拉起來、有顫音 vibrato
-        let carrier = new p5.Oscillator('sawtooth');
-        let vibrato = new p5.Oscillator('sine');
-        let env = new p5.Envelope();
-
-        env.setADSR(0.12, 0.1, 0.38, 0.28);
-        env.setRange(0.26, 0);
-
-        carrier.freq(freq);
-        vibrato.freq(5.6);
-        vibrato.amp(8);
-        vibrato.disconnect();
-        carrier.freq(vibrato);
-
-        carrier.start();
-        vibrato.start();
-        env.play(carrier);
-
-        setTimeout(() => {
-          carrier.stop();
-          vibrato.stop();
-        }, dur + 700);
-      }
-
-      function playBellNote(freq, dur) {
-        // 鐘琴感：高音、尾音較長
-        let env = new p5.Envelope();
-        env.setADSR(0.001, 0.12, 0.18, 0.55);
-        env.setRange(0.42, 0);
-
-        let s1 = new p5.Oscillator('sine');
-        let s2 = new p5.Oscillator('sine');
-        s1.freq(freq * 1.5);
-        s2.freq(freq * 2.42);
-        s1.start();
-        s2.start();
-        s2.amp(0.14);
-        env.play(s1);
-
-        setTimeout(() => {
-          s1.stop();
-          s2.stop();
-        }, dur + 900);
-      }
-
-      function playBassNote(freq, dur) {
-        // 低音伴奏：低頻、短促、有衝擊
-        let env = new p5.Envelope();
-        env.setADSR(0.005, 0.06, 0.28, 0.18);
-        env.setRange(0.55, 0);
-
-        let s = new p5.Oscillator('square');
-        s.freq(freq);
-        s.start();
-        env.play(s);
-
-        setTimeout(() => {
-          s.stop();
-        }, dur + 400);
-      }
-
       function draw() {
         background(10, 15, 25);
         if (!isReady) return;
 
-        // 穩定性監控：如果 3 秒內沒有偵測到任何東西，嘗試重啟偵測
         modelCheckTimer++;
         if (modelCheckTimer > 180) { 
           updateLog("DETECTOR HANG DETECTED. RESTARTING...");
@@ -432,12 +326,14 @@
             let ty = map(indexTip.y, 0, 480, 0, height);
 
             checkButtons(tx, ty);
-            checkFingerInstrumentTriggers(hand, i, gx, gy);
             drawSciFiSkeleton(hand, gx, gy);
             drawFingertips(hand, gx, gy);
             drawHoloDial(hand, i, gx, gy);
             drawCursor(tx, ty);
           }
+
+          // 只用第一隻偵測到的手判斷 1 到 5
+          updateFingerCountTrigger(hands[0]);
 
           if (hands.length === 2) {
             let d = dist(
@@ -457,15 +353,257 @@
           }
         } else {
           linkOsc.amp(0, 0.5);
+          detectedFingerCount = 0;
+          countCandidate = 0;
+          countStableFrames = 0;
+          lastTriggeredCount = 0;
           drawScanningUI();
         }
 
         drawVirtualButtons(gx, gy);
-        drawInstrumentPanel();
-        drawFingerFX();
-        drawMusicStatus();
+        drawSongPanel();
+        drawFingerCountHUD();
+        drawNowPlayingHUD();
 
-        if (musicActiveFrames > 0) musicActiveFrames--;
+        if (songPlayingFrames > 0) songPlayingFrames--;
+      }
+
+      // ===== 判斷伸出幾根手指 =====
+      function updateFingerCountTrigger(hand) {
+        detectedFingerCount = countExtendedFingers(hand);
+
+        if (detectedFingerCount === countCandidate) {
+          countStableFrames++;
+        } else {
+          countCandidate = detectedFingerCount;
+          countStableFrames = 0;
+        }
+
+        let isStable = countStableFrames > COUNT_STABLE_FRAMES;
+        let inRange = detectedFingerCount >= 1 && detectedFingerCount <= 5;
+        let cooledDown = frameCount - lastSongTriggerFrame > SONG_TRIGGER_COOLDOWN_FRAMES;
+
+        if (isStable && inRange && cooledDown && detectedFingerCount !== lastTriggeredCount) {
+          startSongByFingerCount(detectedFingerCount);
+          lastTriggeredCount = detectedFingerCount;
+          lastSongTriggerFrame = frameCount;
+        }
+
+        // 手勢回到 0，才允許同一個數字再次觸發
+        if (detectedFingerCount === 0 && isStable) {
+          lastTriggeredCount = 0;
+        }
+      }
+
+      function countExtendedFingers(hand) {
+        let count = 0;
+        let kp = hand.keypoints;
+        let palm = kp[9];
+
+        // 拇指：用拇指尖到掌心的距離，判斷是否張開
+        let thumbTip = kp[4];
+        let thumbIp = kp[3];
+        let thumbOpen = dist(thumbTip.x, thumbTip.y, palm.x, palm.y) > dist(thumbIp.x, thumbIp.y, palm.x, palm.y) + 18;
+        if (thumbOpen) count++;
+
+        // 其餘四指：指尖比 PIP 關節更高，視為伸出
+        if (kp[8].y < kp[6].y - 10) count++;   // 食指
+        if (kp[12].y < kp[10].y - 10) count++; // 中指
+        if (kp[16].y < kp[14].y - 10) count++; // 無名指
+        if (kp[20].y < kp[18].y - 10) count++; // 小指
+
+        return constrain(count, 0, 5);
+      }
+
+      function startSongByFingerCount(count) {
+        let song = fingerSongMap[count];
+        if (!song) return;
+
+        stopScheduledSong();
+
+        currentSongNumber = count;
+        currentSongTitle = song.title;
+        currentSongColor = song.color;
+        songPlayingFrames = 240;
+        updateLog(`FINGER COUNT ${count}: PLAYING ${song.shortTitle}`);
+
+        playSong(song);
+      }
+
+      function stopScheduledSong() {
+        currentSongTimers.forEach(timer => clearTimeout(timer));
+        currentSongTimers = [];
+      }
+
+      function playSong(song) {
+        let melodyTotal = scheduleSequence(song.melody, song.instrument, 0, song.tempo, 1.0);
+
+        if (song.bass) {
+          scheduleSequence(song.bass, 'bass', 0, song.tempo, 0.72);
+        }
+
+        let endTimer = setTimeout(() => {
+          if (currentSongTitle === song.title) {
+            songPlayingFrames = 0;
+            updateLog(`${song.shortTitle} COMPLETE`);
+          }
+        }, melodyTotal + 900);
+
+        currentSongTimers.push(endTimer);
+      }
+
+      function scheduleSequence(sequence, instrument, startDelay, tempo, volumeScale) {
+        let currentTime = startDelay;
+
+        sequence.forEach(step => {
+          let delay = currentTime;
+          let dur = step.d * tempo;
+
+          let timer = setTimeout(() => {
+            if (step.n && step.n !== 'R') {
+              playInstrumentNote(NOTES[step.n], dur, instrument, volumeScale);
+            }
+
+            if (step.chord) {
+              playChord(step.chord, dur, instrument, volumeScale);
+            }
+          }, delay);
+
+          currentSongTimers.push(timer);
+          currentTime += dur;
+        });
+
+        return currentTime;
+      }
+
+      function playInstrumentNote(freq, dur, instrument, volumeScale = 1) {
+        if (!freq) return;
+
+        if (instrument === 'piano') {
+          playPianoNote(freq, dur, volumeScale);
+        } else if (instrument === 'violin') {
+          playViolinNote(freq, dur, volumeScale);
+        } else if (instrument === 'harpsichord') {
+          playHarpsichordNote(freq, dur, volumeScale);
+        } else if (instrument === 'strings') {
+          playStringNote(freq, dur, volumeScale);
+        } else if (instrument === 'pad') {
+          playPadNote(freq, dur, volumeScale);
+        } else if (instrument === 'bass') {
+          playBassNote(freq, dur, volumeScale);
+        }
+      }
+
+      function playChord(noteNames, dur, instrument, volumeScale = 1) {
+        noteNames.forEach((name, i) => {
+          setTimeout(() => playInstrumentNote(NOTES[name], dur, instrument, volumeScale * 0.75), i * 24);
+        });
+      }
+
+      function playPianoNote(freq, dur, volumeScale = 1) {
+        let env = new p5.Envelope();
+        env.setADSR(0.001, 0.07, 0.22, 0.22);
+        env.setRange(0.45 * volumeScale, 0);
+
+        let s1 = new p5.Oscillator('triangle');
+        let s2 = new p5.Oscillator('sine');
+        s1.freq(freq);
+        s2.freq(freq * 2.01);
+        s1.start();
+        s2.start();
+        s2.amp(0.10 * volumeScale);
+        env.play(s1);
+
+        setTimeout(() => {
+          s1.stop();
+          s2.stop();
+        }, dur + 650);
+      }
+
+      function playViolinNote(freq, dur, volumeScale = 1) {
+        let env = new p5.Envelope();
+        env.setADSR(0.12, 0.12, 0.38, 0.28);
+        env.setRange(0.28 * volumeScale, 0);
+
+        let s1 = new p5.Oscillator('sawtooth');
+        let s2 = new p5.Oscillator('triangle');
+        s1.freq(freq);
+        s2.freq(freq * 2.005);
+        s1.start();
+        s2.start();
+        s2.amp(0.055 * volumeScale);
+        env.play(s1);
+
+        setTimeout(() => {
+          s1.stop();
+          s2.stop();
+        }, dur + 700);
+      }
+
+      function playHarpsichordNote(freq, dur, volumeScale = 1) {
+        let env = new p5.Envelope();
+        env.setADSR(0.001, 0.05, 0.12, 0.12);
+        env.setRange(0.34 * volumeScale, 0);
+
+        let s = new p5.Oscillator('square');
+        s.freq(freq);
+        s.start();
+        env.play(s);
+
+        setTimeout(() => s.stop(), dur + 350);
+      }
+
+      function playStringNote(freq, dur, volumeScale = 1) {
+        let env = new p5.Envelope();
+        env.setADSR(0.06, 0.12, 0.42, 0.35);
+        env.setRange(0.32 * volumeScale, 0);
+
+        let s1 = new p5.Oscillator('sawtooth');
+        let s2 = new p5.Oscillator('sawtooth');
+        s1.freq(freq);
+        s2.freq(freq * 1.005);
+        s1.start();
+        s2.start();
+        s2.amp(0.08 * volumeScale);
+        env.play(s1);
+
+        setTimeout(() => {
+          s1.stop();
+          s2.stop();
+        }, dur + 650);
+      }
+
+      function playPadNote(freq, dur, volumeScale = 1) {
+        let env = new p5.Envelope();
+        env.setADSR(0.22, 0.25, 0.28, 0.75);
+        env.setRange(0.25 * volumeScale, 0);
+
+        let s1 = new p5.Oscillator('sine');
+        let s2 = new p5.Oscillator('triangle');
+        s1.freq(freq);
+        s2.freq(freq * 1.5);
+        s1.start();
+        s2.start();
+        s2.amp(0.08 * volumeScale);
+        env.play(s1);
+
+        setTimeout(() => {
+          s1.stop();
+          s2.stop();
+        }, dur + 1200);
+      }
+
+      function playBassNote(freq, dur, volumeScale = 1) {
+        let env = new p5.Envelope();
+        env.setADSR(0.005, 0.06, 0.25, 0.16);
+        env.setRange(0.42 * volumeScale, 0);
+
+        let s = new p5.Oscillator('square');
+        s.freq(freq);
+        s.start();
+        env.play(s);
+
+        setTimeout(() => s.stop(), dur + 450);
       }
 
       function drawEnergyLink(h1, h2, k, gx, gy) {
@@ -571,20 +709,28 @@
       }
 
       function drawFingertips(hand, gx, gy) {
-        fingerInstruments.forEach(item => {
+        let tips = [
+          { idx: 4, label: 'THUMB' },
+          { idx: 8, label: 'INDEX' },
+          { idx: 12, label: 'MIDDLE' },
+          { idx: 16, label: 'RING' },
+          { idx: 20, label: 'PINKY' }
+        ];
+
+        tips.forEach(item => {
           let k = hand.keypoints[item.idx];
           let x = map(k.x, 0, 640, 0, width) + gx;
           let y = map(k.y, 0, 480, 0, height) + gy;
 
           noFill();
-          stroke(item.color[0], item.color[1], item.color[2], 210);
-          circle(x, y, 16);
+          stroke(255, 180);
+          circle(x, y, 14);
 
-          fill(item.color[0], item.color[1], item.color[2], 210);
+          fill(255, 150);
           noStroke();
           textSize(9);
           textAlign(LEFT, CENTER);
-          text(`${item.instrument}`, x + 15, y - 10);
+          text(item.label, x + 14, y - 8);
         });
       }
 
@@ -610,87 +756,92 @@
         });
       }
 
-      function drawInstrumentPanel() {
-        let panelW = 620;
-        let panelH = 78;
+      function drawSongPanel() {
+        let panelW = 760;
+        let panelH = 92;
         let startX = width / 2 - panelW / 2;
-        let startY = height - 100;
-        let cellW = panelW / fingerInstruments.length;
+        let startY = height - 112;
+        let cellW = panelW / 5;
 
         push();
         noFill();
         stroke(mainColor, 120);
         rect(startX, startY, panelW, panelH, 8);
 
-        fill(255, 180);
+        fill(255, 190);
         noStroke();
         textAlign(CENTER, CENTER);
         textSize(10);
-        text('MOZART PHRASE MODE: move one fingertip downward quickly to play a musical phrase', width / 2, startY - 14);
+        text('FINGER NUMBER MUSIC MODE: show 1 / 2 / 3 / 4 / 5 fingers and hold briefly to play a full phrase', width / 2, startY - 14);
 
-        fingerInstruments.forEach((item, i) => {
-          let x = startX + i * cellW;
-          let c = item.color;
+        for (let i = 1; i <= 5; i++) {
+          let song = fingerSongMap[i];
+          let x = startX + (i - 1) * cellW;
+          let c = song.color;
 
-          stroke(c[0], c[1], c[2], 170);
-          noFill();
+          stroke(c[0], c[1], c[2], currentSongNumber === i && songPlayingFrames > 0 ? 255 : 140);
+          fill(currentSongNumber === i && songPlayingFrames > 0 ? color(c[0], c[1], c[2], 70) : color(0, 0, 0, 0));
           rect(x + 6, startY + 8, cellW - 12, panelH - 16, 4);
 
-          fill(c[0], c[1], c[2], 210);
+          fill(c[0], c[1], c[2], 230);
           noStroke();
-          textSize(11);
-          text(item.finger, x + cellW / 2, startY + 28);
+          textSize(22);
+          text(i, x + cellW / 2, startY + 26);
 
           fill(255);
-          textSize(10);
-          text(item.instrument, x + cellW / 2, startY + 52);
-        });
+          textSize(9);
+          text(song.shortTitle, x + cellW / 2, startY + 54);
+
+          fill(255, 160);
+          textSize(8);
+          text(song.instrument.toUpperCase(), x + cellW / 2, startY + 72);
+        }
         pop();
       }
 
-      function drawFingerFX() {
-        for (let i = activeFingerFX.length - 1; i >= 0; i--) {
-          let fx = activeFingerFX[i];
-          let k = fx.life / fx.maxLife;
-          let c = fx.color;
+      function drawFingerCountHUD() {
+        push();
+        translate(width - 180, 100);
+        noFill();
+        stroke(mainColor, 150);
+        rect(0, 0, 140, 88, 4);
 
-          push();
-          noFill();
-          stroke(c[0], c[1], c[2], 255 * k);
-          strokeWeight(2);
-          circle(fx.x, fx.y, 20 + (1 - k) * 100);
+        fill(mainColor);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textSize(10);
+        text('DETECTED COUNT', 70, 18);
 
-          fill(c[0], c[1], c[2], 255 * k);
-          noStroke();
-          textAlign(CENTER, CENTER);
-          textSize(13);
-          text(fx.label, fx.x, fx.y - 32 - (1 - k) * 24);
-          pop();
+        fill(255);
+        textSize(34);
+        text(detectedFingerCount, 70, 52);
 
-          fx.life--;
-          if (fx.life <= 0) activeFingerFX.splice(i, 1);
-        }
+        fill(255, 160);
+        textSize(8);
+        text(`STABLE ${countStableFrames}/${COUNT_STABLE_FRAMES}`, 70, 75);
+        pop();
       }
 
-      function drawMusicStatus() {
-        if (musicActiveFrames <= 0) return;
+      function drawNowPlayingHUD() {
+        if (songPlayingFrames <= 0) return;
 
+        let c = currentSongColor;
         push();
-        translate(width - 270, 40);
+        translate(width - 320, 40);
         noFill();
-        stroke(0, 255, 255, 160);
-        rect(0, 0, 230, 48, 4);
+        stroke(c[0], c[1], c[2], 180);
+        rect(0, 0, 280, 48, 4);
 
-        fill(0, 255, 255, 70);
-        rect(0, 0, 230, 48, 4);
+        fill(c[0], c[1], c[2], 70);
+        rect(0, 0, 280, 48, 4);
 
         fill(255);
         noStroke();
         textAlign(CENTER, CENTER);
         textSize(10);
-        text('PLAYING MOZART PHRASE', 115, 16);
+        text('NOW PLAYING', 140, 15);
         textSize(11);
-        text(currentMusicLabel, 115, 33);
+        text(currentSongTitle, 140, 33);
         pop();
       }
 
