@@ -119,6 +119,15 @@
       let osc, envelope, linkOsc;
       let modelCheckTimer = 0;
 
+      // ===== 圖片動物手勢同步系統 =====
+      // 把你上傳的圖片另存為 totoro.png，並放在 HTML 同一個資料夾。
+      // 程式會把圖片放在畫面中央，並用你的手勢控制圖片動物的左右手。
+      let avatarImg = null;
+      let avatarReady = false;
+      let avatarLeftPaw = null;
+      let avatarRightPaw = null;
+      const AVATAR_IMAGE_FILE = 'totoro.png';
+
       const NOTES = {
         C2: 65.41, Cs2: 69.30, D2: 73.42, Ds2: 77.78, E2: 82.41, F2: 87.31, Fs2: 92.50, G2: 98.00, Gs2: 103.83, A2: 110.00, As2: 116.54, B2: 123.47,
         C3: 130.81, Cs3: 138.59, D3: 146.83, Ds3: 155.56, E3: 164.81, F3: 174.61, Fs3: 185.00, G3: 196.00, Gs3: 207.65, A3: 220.00, As3: 233.08, B3: 246.94,
@@ -248,6 +257,18 @@
       function setup() {
         createCanvas(windowWidth, windowHeight);
         mainColor = color(colors[colorIdx]);
+
+        avatarImg = loadImage(
+          AVATAR_IMAGE_FILE,
+          () => {
+            avatarReady = true;
+            updateLog('AVATAR IMAGE READY');
+          },
+          () => {
+            avatarReady = false;
+            updateLog('TOToro avatar image not found - using placeholder');
+          }
+        );
 
         osc = new p5.Oscillator('sine');
         envelope = new p5.Envelope();
@@ -399,6 +420,7 @@
           drawScanningUI();
         }
 
+        drawAvatarHands();
         drawVirtualButtons(gx, gy);
         drawGestureGuide();
         drawStatusHUD();
@@ -825,6 +847,168 @@
         if (kp[20].y < kp[18].y - 10) count++;
 
         return constrain(count, 0, 5);
+      }
+
+      // ===== 圖片動物跟著手勢動 =====
+      function drawAvatarHands() {
+        let avatarH = min(height * 0.58, height - 250, 620);
+        avatarH = max(280, avatarH);
+
+        let avatarW = avatarReady ? avatarH * (avatarImg.width / avatarImg.height) : avatarH * 0.68;
+        let avatarX = width / 2 - avatarW / 2;
+        let avatarY = 72;
+
+        let leftShoulder = { x: avatarX + avatarW * 0.20, y: avatarY + avatarH * 0.55 };
+        let rightShoulder = { x: avatarX + avatarW * 0.80, y: avatarY + avatarH * 0.55 };
+        let leftRest = { x: avatarX + avatarW * 0.10, y: avatarY + avatarH * 0.72 };
+        let rightRest = { x: avatarX + avatarW * 0.90, y: avatarY + avatarH * 0.72 };
+
+        let leftTarget = leftRest;
+        let rightTarget = rightRest;
+
+        if (hands && hands.length > 0) {
+          hands.forEach(hand => {
+            let palm = hand.keypoints[9] || hand.keypoints[0];
+            let tx = map(palm.x, 0, 640, 0, width);
+            let ty = map(palm.y, 0, 480, 0, height);
+
+            if (tx < width / 2) {
+              leftTarget = { x: tx, y: ty };
+            } else {
+              rightTarget = { x: tx, y: ty };
+            }
+          });
+        }
+
+        leftTarget = limitArmReach(leftShoulder, leftTarget, avatarW * 0.58);
+        rightTarget = limitArmReach(rightShoulder, rightTarget, avatarW * 0.58);
+
+        if (!avatarLeftPaw) avatarLeftPaw = { x: leftRest.x, y: leftRest.y };
+        if (!avatarRightPaw) avatarRightPaw = { x: rightRest.x, y: rightRest.y };
+
+        avatarLeftPaw.x = lerp(avatarLeftPaw.x, leftTarget.x, 0.22);
+        avatarLeftPaw.y = lerp(avatarLeftPaw.y, leftTarget.y, 0.22);
+        avatarRightPaw.x = lerp(avatarRightPaw.x, rightTarget.x, 0.22);
+        avatarRightPaw.y = lerp(avatarRightPaw.y, rightTarget.y, 0.22);
+
+        push();
+        imageMode(CORNER);
+        if (avatarReady) {
+          tint(255, 245);
+          image(avatarImg, avatarX, avatarY, avatarW, avatarH);
+          noTint();
+        } else {
+          drawAvatarPlaceholder(avatarX, avatarY, avatarW, avatarH);
+        }
+
+        drawCartoonArm(leftShoulder, avatarLeftPaw, -1);
+        drawCartoonArm(rightShoulder, avatarRightPaw, 1);
+        drawAvatarLinkHUD(avatarX, avatarY, avatarW);
+        pop();
+      }
+
+      function limitArmReach(shoulder, target, maxLen) {
+        let dx = target.x - shoulder.x;
+        let dy = target.y - shoulder.y;
+        let d = sqrt(dx * dx + dy * dy);
+
+        if (d > maxLen) {
+          let k = maxLen / d;
+          return {
+            x: shoulder.x + dx * k,
+            y: shoulder.y + dy * k
+          };
+        }
+
+        return target;
+      }
+
+      function drawCartoonArm(shoulder, paw, side) {
+        let midX = (shoulder.x + paw.x) / 2;
+        let midY = (shoulder.y + paw.y) / 2;
+        let elbow = {
+          x: midX + side * 35,
+          y: midY + 30
+        };
+
+        strokeCap(ROUND);
+        noFill();
+
+        // 外框
+        stroke(20, 25, 30, 235);
+        strokeWeight(42);
+        beginShape();
+        vertex(shoulder.x, shoulder.y);
+        quadraticVertex(elbow.x, elbow.y, paw.x, paw.y);
+        endShape();
+
+        // 手臂本體
+        stroke(95, 95, 88, 255);
+        strokeWeight(30);
+        beginShape();
+        vertex(shoulder.x, shoulder.y);
+        quadraticVertex(elbow.x, elbow.y, paw.x, paw.y);
+        endShape();
+
+        // 手掌
+        fill(80, 80, 75);
+        stroke(20, 25, 30, 220);
+        strokeWeight(5);
+        circle(paw.x, paw.y, 48);
+
+        // 小爪子
+        stroke(30, 25, 20, 230);
+        strokeWeight(4);
+        line(paw.x - 13, paw.y + 6, paw.x - 22, paw.y + 16);
+        line(paw.x, paw.y + 10, paw.x, paw.y + 22);
+        line(paw.x + 13, paw.y + 6, paw.x + 22, paw.y + 16);
+
+        // 手勢連線提示
+        noFill();
+        stroke(0, 255, 255, 130);
+        strokeWeight(2);
+        circle(paw.x, paw.y, 62 + sin(frameCount * 8) * 4);
+      }
+
+      function drawAvatarPlaceholder(x, y, w, h) {
+        push();
+        translate(x + w / 2, y + h / 2);
+
+        fill(95, 95, 88, 230);
+        stroke(20, 25, 30);
+        strokeWeight(4);
+        ellipse(0, 20, w * 0.92, h * 0.86);
+
+        fill(245, 235, 180, 235);
+        noStroke();
+        ellipse(0, h * 0.14, w * 0.68, h * 0.48);
+
+        fill(255);
+        circle(-w * 0.18, -h * 0.25, 34);
+        circle(w * 0.18, -h * 0.25, 34);
+        fill(0);
+        circle(-w * 0.18, -h * 0.25, 14);
+        circle(w * 0.18, -h * 0.25, 14);
+
+        fill(120, 210, 70);
+        ellipse(0, -h * 0.39, w * 0.32, h * 0.08);
+        pop();
+      }
+
+      function drawAvatarLinkHUD(x, y, w) {
+        push();
+        translate(x + w / 2 - 125, y - 42);
+        noFill();
+        stroke(0, 255, 255, 160);
+        rect(0, 0, 250, 32, 4);
+        fill(0, 255, 255, 45);
+        rect(0, 0, 250, 32, 4);
+        fill(255);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textSize(10);
+        text('AVATAR HAND LINK ACTIVE', 125, 16);
+        pop();
       }
 
       // ===== 視覺效果 =====
