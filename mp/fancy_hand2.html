@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sci-Fi Hand Tracking - Dual Energy v3.0</title>
+    <title>Sci-Fi Hand Tracking - Finger Instruments</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
@@ -18,7 +18,6 @@
         font-family: 'Courier New', monospace;
       }
       
-      /* UI 控制群組 */
       .nav-group {
         position: fixed;
         top: 20px;
@@ -115,27 +114,24 @@
       let glitchTimer = 0, osc, envelope, linkOsc;
       let modelCheckTimer = 0;
 
-      // ===== 新增：手勢音樂系統 =====
-      let gestureLeadOsc, gestureBassOsc, gestureLeadEnv, gestureBassEnv;
-      let isGestureMusicPlaying = false;
-      let musicTimer = null;
-      let musicStep = 0;
-      let musicPulse = 0;
-
-      // 更明顯的科幻合成器旋律：高音主旋律 + 低音節奏
-      let gestureLeadMelody = [
-        440, 554, 659, 880,
-        784, 659, 554, 440,
-        330, 392, 494, 659,
-        587, 494, 392, 330
+      // ===== 五指樂器系統 =====
+      // MediaPipe / ml5 handPose 指尖 ID：4 拇指、8 食指、12 中指、16 無名指、20 小指
+      const fingerInstruments = [
+        { idx: 4,  finger: 'THUMB',  instrument: 'VIOLIN', note: 659, color: [255, 90, 140] },
+        { idx: 8,  finger: 'INDEX',  instrument: 'PIANO',  note: 523, color: [120, 220, 255] },
+        { idx: 12, finger: 'MIDDLE', instrument: 'BELL',   note: 784, color: [255, 255, 140] },
+        { idx: 16, finger: 'RING',   instrument: 'BASS',   note: 131, color: [150, 255, 160] },
+        { idx: 20, finger: 'PINKY',  instrument: 'PAD',    note: 392, color: [220, 160, 255] }
       ];
 
-      let gestureBassMelody = [
-        110, 110, 147, 147,
-        165, 165, 131, 131
-      ];
+      let lastFingerY = {};
+      let lastFingerTriggerFrame = {};
+      let activeFingerFX = [];
+      let musicActiveFrames = 0;
 
-      const MUSIC_STEP_MS = 190;
+      // 觸發設定：數字越小越敏感，越大越不容易誤觸
+      const FINGER_TAP_SPEED = 22;
+      const FINGER_COOLDOWN_FRAMES = 18;
 
       let buttons = [
         { label: 'COLOR', x: 40, y: 120, w: 90, h: 40, active: false },
@@ -155,22 +151,6 @@
         // 原本的雙手能量連線低頻音
         linkOsc = new p5.Oscillator('sawtooth');
         linkOsc.amp(0);
-
-        // 新增：偵測到手時播放的旋律音源
-        // square 比 triangle 更明顯，sawtooth 用來做低音節奏
-        gestureLeadOsc = new p5.Oscillator('square');
-        gestureLeadOsc.amp(0);
-
-        gestureBassOsc = new p5.Oscillator('sawtooth');
-        gestureBassOsc.amp(0);
-
-        gestureLeadEnv = new p5.Envelope();
-        gestureLeadEnv.setADSR(0.005, 0.05, 0.35, 0.08);
-        gestureLeadEnv.setRange(0.38, 0);
-
-        gestureBassEnv = new p5.Envelope();
-        gestureBassEnv.setADSR(0.005, 0.08, 0.25, 0.12);
-        gestureBassEnv.setRange(0.24, 0);
         
         handPose = ml5.handPose({ flipped: true, maxHands: 2 }, () => {
           document.getElementById('loading-msg').style.display = 'none';
@@ -206,7 +186,7 @@
 
         handPose.detectStart(video, results => {
           hands = results;
-          modelCheckTimer = 0; // 只要有結果回來就重置計時器
+          modelCheckTimer = 0;
         });
       }
 
@@ -225,55 +205,161 @@
         }, 50);
       }
 
-      // ===== 新增：手勢音樂播放函式 =====
-      function startGestureMusic() {
-        if (isGestureMusicPlaying) return;
+      // ===== 新增：不同手指觸發不同樂器音色 =====
+      function checkFingerInstrumentTriggers(hand, handId, gx, gy) {
+        fingerInstruments.forEach(item => {
+          let tip = hand.keypoints[item.idx];
+          let x = map(tip.x, 0, 640, 0, width) + gx;
+          let y = map(tip.y, 0, 480, 0, height) + gy;
+          let key = `${handId}_${item.idx}`;
 
-        isGestureMusicPlaying = true;
-        musicStep = 0;
-        musicPulse = 45;
+          if (lastFingerY[key] === undefined) {
+            lastFingerY[key] = y;
+            lastFingerTriggerFrame[key] = -999;
+            return;
+          }
 
-        gestureLeadOsc.start();
-        gestureBassOsc.start();
-        updateLog("GESTURE MUSIC ACTIVE");
+          let dy = y - lastFingerY[key];
+          let cooledDown = frameCount - lastFingerTriggerFrame[key] > FINGER_COOLDOWN_FRAMES;
 
-        playGestureStep();
+          // 手指快速往下點一下，就觸發該手指對應的樂器
+          if (dy > FINGER_TAP_SPEED && cooledDown) {
+            triggerFingerInstrument(item, x, y);
+            lastFingerTriggerFrame[key] = frameCount;
+          }
+
+          lastFingerY[key] = y;
+        });
       }
 
-      function playGestureStep() {
-        if (!isGestureMusicPlaying) return;
+      function triggerFingerInstrument(item, x, y) {
+        musicActiveFrames = 40;
+        updateLog(`${item.finger} TRIGGERED ${item.instrument}`);
 
-        let leadFreq = gestureLeadMelody[musicStep % gestureLeadMelody.length];
-        let bassFreq = gestureBassMelody[floor(musicStep / 2) % gestureBassMelody.length];
-
-        // 主旋律每一步播放
-        gestureLeadOsc.freq(leadFreq);
-        gestureLeadEnv.play(gestureLeadOsc);
-
-        // 低音每兩步播放一次，讓節奏更有存在感
-        if (musicStep % 2 === 0) {
-          gestureBassOsc.freq(bassFreq);
-          gestureBassEnv.play(gestureBassOsc);
+        if (item.instrument === 'PIANO') {
+          playPiano(item.note);
+        } else if (item.instrument === 'VIOLIN') {
+          playViolin(item.note);
+        } else if (item.instrument === 'BELL') {
+          playBell(item.note);
+        } else if (item.instrument === 'BASS') {
+          playBass(item.note);
+        } else if (item.instrument === 'PAD') {
+          playPad(item.note);
         }
 
-        musicPulse = 45;
-        musicStep++;
-        musicTimer = setTimeout(playGestureStep, MUSIC_STEP_MS);
+        activeFingerFX.push({
+          x,
+          y,
+          label: item.instrument,
+          color: item.color,
+          life: 32,
+          maxLife: 32
+        });
       }
 
-      function stopGestureMusic() {
-        if (!isGestureMusicPlaying) return;
+      function playPiano(freq) {
+        // 鋼琴感：短促、明亮、帶一點泛音
+        let env = new p5.Envelope();
+        env.setADSR(0.001, 0.08, 0.18, 0.25);
+        env.setRange(0.55, 0);
 
-        isGestureMusicPlaying = false;
+        let s1 = new p5.Oscillator('triangle');
+        let s2 = new p5.Oscillator('sine');
+        s1.freq(freq);
+        s2.freq(freq * 2.01);
+        s1.start();
+        s2.start();
+        s2.amp(0.12);
+        env.play(s1);
 
-        if (musicTimer) {
-          clearTimeout(musicTimer);
-          musicTimer = null;
-        }
+        setTimeout(() => {
+          s1.stop();
+          s2.stop();
+        }, 700);
+      }
 
-        gestureLeadOsc.amp(0, 0.3);
-        gestureBassOsc.amp(0, 0.3);
-        updateLog("GESTURE MUSIC STANDBY");
+      function playViolin(freq) {
+        // 小提琴感：慢慢拉起來、有顫音 vibrato
+        let carrier = new p5.Oscillator('sawtooth');
+        let vibrato = new p5.Oscillator('sine');
+        let env = new p5.Envelope();
+
+        env.setADSR(0.18, 0.12, 0.45, 0.35);
+        env.setRange(0.32, 0);
+
+        carrier.freq(freq);
+        vibrato.freq(5.5);
+        vibrato.amp(9);
+        vibrato.disconnect();
+        carrier.freq(vibrato);
+
+        carrier.start();
+        vibrato.start();
+        env.play(carrier);
+
+        setTimeout(() => {
+          carrier.stop();
+          vibrato.stop();
+        }, 1000);
+      }
+
+      function playBell(freq) {
+        // 鈴聲感：高音、快速敲擊、尾音較長
+        let env = new p5.Envelope();
+        env.setADSR(0.001, 0.12, 0.18, 0.6);
+        env.setRange(0.5, 0);
+
+        let s1 = new p5.Oscillator('sine');
+        let s2 = new p5.Oscillator('sine');
+        s1.freq(freq);
+        s2.freq(freq * 2.42);
+        s1.start();
+        s2.start();
+        s2.amp(0.16);
+        env.play(s1);
+
+        setTimeout(() => {
+          s1.stop();
+          s2.stop();
+        }, 1000);
+      }
+
+      function playBass(freq) {
+        // 低音感：低頻、短促、有衝擊
+        let env = new p5.Envelope();
+        env.setADSR(0.005, 0.05, 0.3, 0.15);
+        env.setRange(0.65, 0);
+
+        let s = new p5.Oscillator('square');
+        s.freq(freq);
+        s.start();
+        env.play(s);
+
+        setTimeout(() => {
+          s.stop();
+        }, 550);
+      }
+
+      function playPad(freq) {
+        // 合成器 pad：柔和、比較像背景和弦
+        let env = new p5.Envelope();
+        env.setADSR(0.2, 0.3, 0.25, 0.8);
+        env.setRange(0.24, 0);
+
+        let s1 = new p5.Oscillator('sine');
+        let s2 = new p5.Oscillator('triangle');
+        s1.freq(freq);
+        s2.freq(freq * 1.5);
+        s1.start();
+        s2.start();
+        s2.amp(0.12);
+        env.play(s1);
+
+        setTimeout(() => {
+          s1.stop();
+          s2.stop();
+        }, 1500);
       }
 
       function draw() {
@@ -300,9 +386,6 @@
         pop();
 
         if (hands && hands.length > 0) {
-          // 新增：只要偵測到手，就開始播放旋律
-          startGestureMusic();
-
           for (let i = 0; i < hands.length; i++) {
             let hand = hands[i];
             let indexTip = hand.keypoints[8];
@@ -310,6 +393,7 @@
             let ty = map(indexTip.y, 0, 480, 0, height);
 
             checkButtons(tx, ty);
+            checkFingerInstrumentTriggers(hand, i, gx, gy);
             drawSciFiSkeleton(hand, gx, gy);
             drawFingertips(hand, gx, gy);
             drawHoloDial(hand, i, gx, gy);
@@ -333,16 +417,16 @@
             linkOsc.amp(0, 0.5);
           }
         } else {
-          // 新增：沒有偵測到手時停止旋律
-          stopGestureMusic();
           linkOsc.amp(0, 0.5);
           drawScanningUI();
         }
 
         drawVirtualButtons(gx, gy);
+        drawInstrumentPanel();
+        drawFingerFX();
         drawMusicStatus();
 
-        if (musicPulse > 0) musicPulse--;
+        if (musicActiveFrames > 0) musicActiveFrames--;
       }
 
       function drawEnergyLink(h1, h2, k, gx, gy) {
@@ -424,12 +508,6 @@
             } else if (btn.label === 'GLITCH') {
               glitchTimer = 25;
               playTone(150);
-
-              // 新增：GLITCH 時讓手勢旋律短暫變慢，增加故障感
-              if (isGestureMusicPlaying) {
-                gestureLeadOsc.freq(90);
-                gestureBassOsc.freq(55);
-              }
             }
           } else if (!isInside) {
             btn.active = false;
@@ -454,18 +532,20 @@
       }
 
       function drawFingertips(hand, gx, gy) {
-        [4, 8, 12, 16, 20].forEach(idx => {
-          let k = hand.keypoints[idx];
+        fingerInstruments.forEach(item => {
+          let k = hand.keypoints[item.idx];
           let x = map(k.x, 0, 640, 0, width) + gx;
           let y = map(k.y, 0, 480, 0, height) + gy;
 
           noFill();
-          stroke(255, 180);
-          circle(x, y, 12);
+          stroke(item.color[0], item.color[1], item.color[2], 210);
+          circle(x, y, 16);
 
-          fill(255, 150);
+          fill(item.color[0], item.color[1], item.color[2], 210);
+          noStroke();
           textSize(9);
-          text(`ID:${idx}`, x + 15, y - 10);
+          textAlign(LEFT, CENTER);
+          text(`${item.instrument}`, x + 15, y - 10);
         });
       }
 
@@ -491,6 +571,88 @@
         });
       }
 
+      function drawInstrumentPanel() {
+        let panelW = 500;
+        let panelH = 72;
+        let startX = width / 2 - panelW / 2;
+        let startY = height - 95;
+        let cellW = panelW / fingerInstruments.length;
+
+        push();
+        noFill();
+        stroke(mainColor, 120);
+        rect(startX, startY, panelW, panelH, 8);
+
+        fill(255, 180);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textSize(10);
+        text('FINGER INSTRUMENT MODE: move one fingertip downward quickly to play', width / 2, startY - 14);
+
+        fingerInstruments.forEach((item, i) => {
+          let x = startX + i * cellW;
+          let c = item.color;
+
+          stroke(c[0], c[1], c[2], 170);
+          noFill();
+          rect(x + 6, startY + 8, cellW - 12, panelH - 16, 4);
+
+          fill(c[0], c[1], c[2], 210);
+          noStroke();
+          textSize(11);
+          text(item.finger, x + cellW / 2, startY + 26);
+
+          fill(255);
+          textSize(12);
+          text(item.instrument, x + cellW / 2, startY + 48);
+        });
+        pop();
+      }
+
+      function drawFingerFX() {
+        for (let i = activeFingerFX.length - 1; i >= 0; i--) {
+          let fx = activeFingerFX[i];
+          let k = fx.life / fx.maxLife;
+          let c = fx.color;
+
+          push();
+          noFill();
+          stroke(c[0], c[1], c[2], 255 * k);
+          strokeWeight(2);
+          circle(fx.x, fx.y, 20 + (1 - k) * 80);
+
+          fill(c[0], c[1], c[2], 255 * k);
+          noStroke();
+          textAlign(CENTER, CENTER);
+          textSize(13);
+          text(fx.label, fx.x, fx.y - 32 - (1 - k) * 20);
+          pop();
+
+          fx.life--;
+          if (fx.life <= 0) activeFingerFX.splice(i, 1);
+        }
+      }
+
+      function drawMusicStatus() {
+        if (musicActiveFrames <= 0) return;
+
+        push();
+        translate(width - 210, 40);
+        noFill();
+        stroke(0, 255, 255, 160);
+        rect(0, 0, 170, 42, 4);
+
+        fill(0, 255, 255, 70);
+        rect(0, 0, 170, 42, 4);
+
+        fill(255);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textSize(11);
+        text('FINGER SOUND ACTIVE', 85, 21);
+        pop();
+      }
+
       function drawCursor(tx, ty) {
         fill(255);
         circle(tx, ty, 6);
@@ -503,32 +665,6 @@
       function drawScanningUI() {
         stroke(mainColor, 60);
         line(0, (frameCount * 4) % height, width, (frameCount * 4) % height);
-      }
-
-      function drawMusicStatus() {
-        if (!isGestureMusicPlaying) return;
-
-        let pulseSize = 10 + musicPulse * 0.35;
-
-        push();
-        translate(width - 190, 40);
-        noFill();
-        stroke(0, 255, 255, 160);
-        rect(0, 0, 150, 42, 4);
-
-        fill(0, 255, 255, 70);
-        rect(0, 0, 150, 42, 4);
-
-        fill(255);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(11);
-        text("MUSIC ACTIVE", 75, 21);
-
-        noFill();
-        stroke(255, 255, 255, 160);
-        circle(18, 21, pulseSize);
-        pop();
       }
 
       function windowResized() {
