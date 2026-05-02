@@ -406,7 +406,8 @@
 
       // ===== 選曲手勢：數字 1 到 6，以及 O / OK =====
       function detectSelectionGesture(activeHands, counts) {
-        if (activeHands.some(h => isOKGesture(h))) return 'O';
+        // O 手勢：拇指與食指碰在一起，另外三根手指收起來，用來選 Roar。
+        if (activeHands.some(h => isOSelectGesture(h))) return 'O';
 
         let total = constrain(counts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
         if (total >= 1 && total <= MAX_FINGER_COUNT) return String(total);
@@ -437,7 +438,7 @@
         updateLog(`SELECTED ${selectedTrack.shortTitle}. USE PLAY GESTURE.`);
       }
 
-      function isOKGesture(hand) {
+      function thumbAndIndexTouching(hand) {
         let kp = hand.keypoints;
         let thumbTip = kp[4];
         let indexTip = kp[8];
@@ -445,19 +446,48 @@
         let palm = kp[9];
         let handScale = dist(wrist.x, wrist.y, palm.x, palm.y);
         let thumbIndexDistance = dist(thumbTip.x, thumbTip.y, indexTip.x, indexTip.y);
-        let okThreshold = max(22, handScale * 0.42);
-        return thumbIndexDistance < okThreshold;
+        let touchThreshold = max(22, handScale * 0.42);
+        return thumbIndexDistance < touchThreshold;
+      }
+
+      function isFingerExtended(hand, tipIdx, pipIdx) {
+        let kp = hand.keypoints;
+        return kp[tipIdx].y < kp[pipIdx].y - 10;
+      }
+
+      function isOSelectGesture(hand) {
+        // O：拇指食指碰在一起，中指、無名指、小指都收起來。
+        if (!thumbAndIndexTouching(hand)) return false;
+
+        let middleOpen = isFingerExtended(hand, 12, 10);
+        let ringOpen = isFingerExtended(hand, 16, 14);
+        let pinkyOpen = isFingerExtended(hand, 20, 18);
+
+        return !middleOpen && !ringOpen && !pinkyOpen;
+      }
+
+      function isOKPlayGesture(hand) {
+        // OK：拇指食指碰在一起，中指、無名指、小指都伸直。
+        if (!thumbAndIndexTouching(hand)) return false;
+
+        let middleOpen = isFingerExtended(hand, 12, 10);
+        let ringOpen = isFingerExtended(hand, 16, 14);
+        let pinkyOpen = isFingerExtended(hand, 20, 18);
+
+        return middleOpen && ringOpen && pinkyOpen;
       }
 
       // ===== 播放控制手勢 =====
-      // PLAY / RESUME：雙手張開，總手指數 9 到 10。
+      // PLAY / RESUME：OK 手勢，拇指食指碰在一起，另外三根手指伸直。
       // PAUSE：單手握拳，0 根手指。
       // STOP：雙手握拳，總手指數 0。
       function detectControlGesture(activeHands, counts) {
-        let total = counts.reduce((a, b) => a + b, 0);
-
         if (activeHands.length >= 2 && counts[0] === 0 && counts[1] === 0) return 'STOP';
-        if (activeHands.length >= 2 && total >= 9) return 'PLAY';
+
+        for (let i = 0; i < activeHands.length; i++) {
+          if (isOKPlayGesture(activeHands[i])) return 'PLAY';
+        }
+
         if (activeHands.length === 1 && counts[0] === 0) return 'PAUSE';
         return '';
       }
@@ -949,7 +979,7 @@
         noStroke();
         textAlign(CENTER, CENTER);
         textSize(10);
-        text('SELECT MUSIC: show number 1-6, or make O / OK gesture. Then use control gestures to play, pause, or stop.', width / 2, startY - 14);
+        text('SELECT MUSIC: show number 1-6, or make O gesture for Roar. Then use OK / fist controls to play, pause, or stop.', width / 2, startY - 14);
 
         let keys = ['1', '2', '3', '4', '5', '6', 'O'];
         keys.forEach((key, i) => {
@@ -978,7 +1008,7 @@
 
         fill(255, 190);
         textSize(10);
-        text('CONTROL: 2 open hands = PLAY / RESUME     1 fist = PAUSE     2 fists = STOP', width / 2, startY + 102);
+        text('CONTROL: OK sign = PLAY / RESUME     1 fist = PAUSE     2 fists = STOP', width / 2, startY + 102);
         pop();
       }
 
