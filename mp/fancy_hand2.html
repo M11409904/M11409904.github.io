@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sci-Fi Hand Tracking - Gesture Music Controller</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gesture Music + Totoro Hand Control Final</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
@@ -13,123 +13,86 @@
       html, body {
         margin: 0;
         padding: 0;
-        background-color: #0a0f19;
+        background: #0a0f19;
         overflow: hidden;
-        font-family: 'Courier New', monospace;
-      }
-
-      .nav-group {
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        z-index: 2000;
-        display: flex;
-        gap: 10px;
-      }
-
-      .nav-btn {
-        padding: 10px 15px;
-        font-size: 0.75em;
-        border-radius: 4px;
-        text-decoration: none;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        transition: all 0.3s;
-        cursor: pointer;
-      }
-
-      #back-btn {
-        background: rgba(0, 255, 255, 0.05);
-        border: 1px solid rgba(0, 255, 255, 0.2);
-        color: #0ff;
-      }
-
-      #reload-btn {
-        background: rgba(255, 50, 50, 0.05);
-        border: 1px solid rgba(255, 50, 50, 0.3);
-        color: #f33;
-      }
-
-      .nav-btn:hover {
-        background: rgba(255, 255, 255, 0.15);
-        box-shadow: 0 0 10px currentColor;
+        font-family: "Courier New", monospace;
       }
 
       #overlay {
         position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+        inset: 0;
         background: #0a0f19;
         display: flex;
         flex-direction: column;
-        justify-content: center;
         align-items: center;
-        z-index: 1000;
+        justify-content: center;
         color: #0ff;
+        z-index: 999;
       }
 
       .start-btn {
-        background: transparent;
+        margin-top: 18px;
+        padding: 12px 28px;
         border: 1px solid #0ff;
+        background: transparent;
         color: #0ff;
-        padding: 12px 35px;
-        font-size: 1.1em;
         cursor: pointer;
-        margin-top: 20px;
         letter-spacing: 4px;
+        font-size: 1.05rem;
       }
 
       #status-log {
         position: fixed;
+        left: 12px;
         bottom: 10px;
-        left: 10px;
-        color: rgba(0, 255, 255, 0.4);
-        font-size: 10px;
-        z-index: 2000;
+        color: rgba(0,255,255,0.55);
+        font-size: 11px;
+        z-index: 1000;
       }
     </style>
   </head>
 
   <body>
-    <div class="nav-group">
-      <a href="../perception_demo.html" id="back-btn" class="nav-btn">HUB</a>
-      <div id="reload-btn" class="nav-btn" onclick="location.reload()">RELOAD SYSTEM</div>
+    <div id="overlay">
+      <div style="letter-spacing:8px; font-size:1.5rem;">GESTURE MUSIC AVATAR</div>
+      <div id="loading-msg" style="margin-top:10px; font-size:12px; color:rgba(0,255,255,0.65);">
+        LOADING AI ENGINE...
+      </div>
+      <button id="init-btn" class="start-btn" style="display:none;" onclick="initSystem()">
+        ACTIVATE_LINK
+      </button>
     </div>
 
     <div id="status-log">SYSTEM IDLE</div>
 
-    <div id="overlay">
-      <div style="letter-spacing: 8px; font-size: 1.5em;">CORE_STABILIZER_V3</div>
-      <div id="loading-msg" style="margin-top:10px; font-size: 12px; color: rgba(0,255,255,0.6);">LOADING AI ENGINE...</div>
-      <button id="init-btn" class="start-btn" onclick="initSystem()" style="display:none;">ACTIVATE_LINK</button>
-    </div>
-
     <script>
+      // =========================
+      // 基本系統
+      // =========================
       let video, handPose, hands = [];
       let isReady = false;
-      let smoothedAngle = [0, 0];
-      let lastTickAngle = [0, 0];
-      let smoothedPos = [{x:0, y:0}, {x:0, y:0}];
+      let modelCheckTimer = 0;
+
       let mainColor;
       let colors = ['#00ffff', '#ff00ff', '#ffff00'];
       let colorIdx = 0;
-      let glitchTimer = 0;
-      let osc, envelope, linkOsc;
-      let modelCheckTimer = 0;
 
-      // ===== 圖片動物手勢同步系統 =====
-      // 把去背景的龍貓圖另存為 totoro_cutout.png，並放在 HTML 同一個資料夾。
-      // 這版不再用程式創造手臂 / 手掌，而是直接從圖片裁出「整隻手」當作動態貼圖。
+      // UI 提示音
+      let uiOsc, uiEnv;
+
+      // =========================
+      // 圖片角色設定
+      // =========================
+      // 請把去背好的龍貓圖命名為 totoro_cutout.png
+      const AVATAR_IMAGE_FILE = 'totoro_cutout.png';
+
       let avatarImg = null;
       let avatarReady = false;
       let avatarLeftPaw = null;
       let avatarRightPaw = null;
-      const AVATAR_IMAGE_FILE = 'totoro_cutout.png';
 
-      // 從去背龍貓圖中裁出「整隻左手」與「整隻右手」的比例位置。
-      // x / y / w / h 是裁切範圍；pivot 是肩膀旋轉點；handle 是手掌末端追蹤點。
+      // 從去背龍貓圖中裁出的整隻左手 / 右手
+      // 若你的圖和我假設的位置不同，可再微調
       const LEFT_ARM_SPRITE = {
         x: 0.00, y: 0.02, w: 0.38, h: 0.47,
         pivot:  { x: 0.78, y: 0.76 },
@@ -142,26 +105,101 @@
         handle: { x: 0.78, y: 0.24 }
       };
 
-      // 中央身體裁切，避免原圖靜態手臂留在畫面上。
+      // 中央身體裁切
       const BODY_SPRITE = {
-        x: 0.29, y: 0.13, w: 0.50, h: 0.83
+        x: 0.24, y: 0.12, w: 0.54, h: 0.84
       };
 
+      // 用橢圓模擬龍貓的圓形身體，讓手臂接點沿著身體邊界滑動
+      const BODY_ELLIPSE = {
+        cx: 0.50,
+        cy: 0.57,
+        rx: 0.23,
+        ry: 0.31
+      };
+
+      // 左右手在身體邊界可滑動的角度範圍
+      const LEFT_ARM_ANGLE_RANGE = {
+        min: 150,
+        max: 238,
+        idle: 205
+      };
+
+      const RIGHT_ARM_ANGLE_RANGE = {
+        min: -58,
+        max: 28,
+        idle: -20
+      };
+
+      // =========================
+      // 音樂系統
+      // =========================
+      let roarSound = null;
+      let roarLoaded = false;
+
+      let activeOscillators = [];
+      let songTimers = [];
+
+      let selectedTrackKey = '1';
+      let playingTrackKey = null;
+
+      let playerState = 'stopped'; // stopped / playing / paused
+      let currentSongTitle = 'No music playing';
+      let currentSongColor = [0, 255, 255];
+
+      let trackStartMs = 0;
+      let pauseElapsedMs = 0;
+      let audioPauseTime = 0;
+
+      // =========================
+      // 手勢判斷狀態
+      // =========================
+      let handCounts = [];
+      let detectedFingerCount = 0;
+
+      let selectionCandidate = '';
+      let selectionStableFrames = 0;
+      let lastSelectionTriggerFrame = -999;
+
+      let controlCandidate = '';
+      let controlStableFrames = 0;
+      let lastControlTriggerFrame = -999;
+
+      const SELECTION_STABLE_FRAMES = 18;
+      const CONTROL_STABLE_FRAMES = 18;
+      const SELECTION_COOLDOWN_FRAMES = 55;
+      const CONTROL_COOLDOWN_FRAMES = 55;
+      const MAX_FINGER_COUNT = 6;
+
+      // =========================
+      // 音高
+      // =========================
       const NOTES = {
         C2: 65.41, Cs2: 69.30, D2: 73.42, Ds2: 77.78, E2: 82.41, F2: 87.31, Fs2: 92.50, G2: 98.00, Gs2: 103.83, A2: 110.00, As2: 116.54, B2: 123.47,
         C3: 130.81, Cs3: 138.59, D3: 146.83, Ds3: 155.56, E3: 164.81, F3: 174.61, Fs3: 185.00, G3: 196.00, Gs3: 207.65, A3: 220.00, As3: 233.08, B3: 246.94,
         C4: 261.63, Cs4: 277.18, D4: 293.66, Ds4: 311.13, E4: 329.63, F4: 349.23, Fs4: 369.99, G4: 392.00, Gs4: 415.30, A4: 440.00, As4: 466.16, B4: 493.88,
         C5: 523.25, Cs5: 554.37, D5: 587.33, Ds5: 622.25, E5: 659.25, F5: 698.46, Fs5: 739.99, G5: 783.99, Gs5: 830.61, A5: 880.00, As5: 932.33, B5: 987.77,
-        C6: 1046.50, Cs6: 1108.73, D6: 1174.66, Ds6: 1244.51, E6: 1318.51, F6: 1396.91, Fs6: 1479.98, G6: 1567.98, A6: 1760.00
+        C6: 1046.50, D6: 1174.66, E6: 1318.51, F6: 1396.91, G6: 1567.98, A6: 1760.00
       };
 
+      // =========================
+      // 曲目
+      // =========================
       const tracks = {
         '1': {
-          key: '1', title: '1 - Mozart / Eine kleine Nachtmusik', shortTitle: 'MOZART VIOLIN', instrument: 'violin', color: [255, 90, 140], tempo: 1.0,
+          key: '1',
+          title: '1 - Mozart / Eine kleine Nachtmusik',
+          shortTitle: 'MOZART VIOLIN',
+          instrument: 'violin',
+          color: [255, 90, 140],
+          tempo: 1.0,
           melody: [
-            { n: 'G4', d: 220 }, { n: 'D4', d: 220 }, { n: 'G4', d: 220 }, { n: 'B4', d: 220 }, { n: 'D5', d: 440 }, { n: 'B4', d: 220 }, { n: 'G4', d: 440 },
-            { n: 'D5', d: 220 }, { n: 'B4', d: 220 }, { n: 'D5', d: 220 }, { n: 'G5', d: 220 }, { n: 'Fs5', d: 300 }, { n: 'E5', d: 140 }, { n: 'D5', d: 440 },
-            { n: 'E5', d: 220 }, { n: 'C5', d: 220 }, { n: 'E5', d: 220 }, { n: 'G5', d: 220 }, { n: 'Fs5', d: 300 }, { n: 'E5', d: 140 }, { n: 'D5', d: 440 },
+            { n: 'G4', d: 220 }, { n: 'D4', d: 220 }, { n: 'G4', d: 220 }, { n: 'B4', d: 220 },
+            { n: 'D5', d: 440 }, { n: 'B4', d: 220 }, { n: 'G4', d: 440 },
+            { n: 'D5', d: 220 }, { n: 'B4', d: 220 }, { n: 'D5', d: 220 }, { n: 'G5', d: 220 },
+            { n: 'Fs5', d: 300 }, { n: 'E5', d: 140 }, { n: 'D5', d: 440 },
+            { n: 'E5', d: 220 }, { n: 'C5', d: 220 }, { n: 'E5', d: 220 }, { n: 'G5', d: 220 },
+            { n: 'Fs5', d: 300 }, { n: 'E5', d: 140 }, { n: 'D5', d: 440 },
             { n: 'B4', d: 220 }, { n: 'G4', d: 220 }, { n: 'A4', d: 220 }, { n: 'Fs4', d: 220 }, { n: 'G4', d: 700 }
           ],
           bass: [
@@ -169,56 +207,94 @@
             { n: 'C3', d: 440 }, { n: 'D3', d: 440 }, { n: 'G2', d: 880 }
           ]
         },
+
         '2': {
-          key: '2', title: '2 - Beethoven / Fur Elise', shortTitle: 'BEETHOVEN PIANO', instrument: 'piano', color: [120, 220, 255], tempo: 1.0,
+          key: '2',
+          title: '2 - Beethoven / Fur Elise',
+          shortTitle: 'BEETHOVEN PIANO',
+          instrument: 'piano',
+          color: [120, 220, 255],
+          tempo: 1.0,
           melody: [
-            { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'B4', d: 160 }, { n: 'D5', d: 160 }, { n: 'C5', d: 160 }, { n: 'A4', d: 420 },
+            { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 },
+            { n: 'E5', d: 160 }, { n: 'B4', d: 160 }, { n: 'D5', d: 160 }, { n: 'C5', d: 160 }, { n: 'A4', d: 420 },
             { n: 'C4', d: 160 }, { n: 'E4', d: 160 }, { n: 'A4', d: 160 }, { n: 'B4', d: 420 },
             { n: 'E4', d: 160 }, { n: 'Gs4', d: 160 }, { n: 'B4', d: 160 }, { n: 'C5', d: 420 },
-            { n: 'E4', d: 160 }, { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'B4', d: 160 }, { n: 'D5', d: 160 }, { n: 'C5', d: 160 }, { n: 'A4', d: 520 }
+            { n: 'E4', d: 160 }, { n: 'E5', d: 160 }, { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 },
+            { n: 'Ds5', d: 160 }, { n: 'E5', d: 160 }, { n: 'B4', d: 160 }, { n: 'D5', d: 160 }, { n: 'C5', d: 160 }, { n: 'A4', d: 520 }
           ],
           bass: [
             { n: 'A2', d: 640 }, { n: 'E3', d: 640 }, { n: 'A2', d: 640 }, { n: 'E3', d: 640 }, { n: 'A2', d: 880 }
           ]
         },
+
         '3': {
-          key: '3', title: '3 - Bach / Minuet in G', shortTitle: 'BACH HARPSICHORD', instrument: 'harpsichord', color: [255, 255, 140], tempo: 0.95,
+          key: '3',
+          title: '3 - Bach / Minuet in G',
+          shortTitle: 'BACH HARPSICHORD',
+          instrument: 'harpsichord',
+          color: [255, 255, 140],
+          tempo: 0.95,
           melody: [
-            { n: 'G4', d: 220 }, { n: 'D5', d: 220 }, { n: 'B4', d: 220 }, { n: 'C5', d: 220 }, { n: 'D5', d: 440 }, { n: 'G4', d: 220 }, { n: 'G4', d: 220 },
-            { n: 'E5', d: 220 }, { n: 'C5', d: 220 }, { n: 'D5', d: 220 }, { n: 'E5', d: 220 }, { n: 'Fs5', d: 440 }, { n: 'G5', d: 220 }, { n: 'G4', d: 220 },
-            { n: 'C5', d: 220 }, { n: 'D5', d: 220 }, { n: 'C5', d: 220 }, { n: 'B4', d: 220 }, { n: 'A4', d: 440 }, { n: 'B4', d: 220 }, { n: 'C5', d: 220 },
-            { n: 'B4', d: 220 }, { n: 'A4', d: 220 }, { n: 'G4', d: 660 }
+            { n: 'G4', d: 220 }, { n: 'D5', d: 220 }, { n: 'B4', d: 220 }, { n: 'C5', d: 220 }, { n: 'D5', d: 440 },
+            { n: 'G4', d: 220 }, { n: 'G4', d: 220 }, { n: 'E5', d: 220 }, { n: 'C5', d: 220 }, { n: 'D5', d: 220 },
+            { n: 'E5', d: 220 }, { n: 'Fs5', d: 440 }, { n: 'G5', d: 220 }, { n: 'G4', d: 220 },
+            { n: 'C5', d: 220 }, { n: 'D5', d: 220 }, { n: 'C5', d: 220 }, { n: 'B4', d: 220 }, { n: 'A4', d: 440 },
+            { n: 'B4', d: 220 }, { n: 'C5', d: 220 }, { n: 'B4', d: 220 }, { n: 'A4', d: 220 }, { n: 'G4', d: 660 }
           ],
           bass: [
             { n: 'G3', d: 660 }, { n: 'D3', d: 660 }, { n: 'C3', d: 660 }, { n: 'D3', d: 660 }, { n: 'G2', d: 660 }
           ]
         },
+
         '4': {
-          key: '4', title: '4 - Vivaldi / Spring', shortTitle: 'VIVALDI STRINGS', instrument: 'strings', color: [150, 255, 160], tempo: 0.82,
+          key: '4',
+          title: '4 - Vivaldi / Spring',
+          shortTitle: 'VIVALDI STRINGS',
+          instrument: 'strings',
+          color: [150, 255, 160],
+          tempo: 0.82,
           melody: [
-            { n: 'E5', d: 180 }, { n: 'E5', d: 180 }, { n: 'E5', d: 180 }, { n: 'D5', d: 180 }, { n: 'C5', d: 360 }, { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 360 },
-            { n: 'G5', d: 180 }, { n: 'G5', d: 180 }, { n: 'G5', d: 180 }, { n: 'F5', d: 180 }, { n: 'E5', d: 360 }, { n: 'D5', d: 180 }, { n: 'C5', d: 180 }, { n: 'B4', d: 360 },
-            { n: 'C5', d: 180 }, { n: 'E5', d: 180 }, { n: 'G5', d: 180 }, { n: 'C6', d: 180 }, { n: 'B5', d: 180 }, { n: 'A5', d: 180 }, { n: 'G5', d: 360 },
-            { n: 'E5', d: 180 }, { n: 'D5', d: 180 }, { n: 'C5', d: 600 }
+            { n: 'E5', d: 180 }, { n: 'E5', d: 180 }, { n: 'E5', d: 180 }, { n: 'D5', d: 180 },
+            { n: 'C5', d: 360 }, { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 360 },
+            { n: 'G5', d: 180 }, { n: 'G5', d: 180 }, { n: 'G5', d: 180 }, { n: 'F5', d: 180 },
+            { n: 'E5', d: 360 }, { n: 'D5', d: 180 }, { n: 'C5', d: 180 }, { n: 'B4', d: 360 },
+            { n: 'C5', d: 180 }, { n: 'E5', d: 180 }, { n: 'G5', d: 180 }, { n: 'C6', d: 180 },
+            { n: 'B5', d: 180 }, { n: 'A5', d: 180 }, { n: 'G5', d: 360 }, { n: 'E5', d: 180 }, { n: 'D5', d: 180 }, { n: 'C5', d: 600 }
           ],
           bass: [
             { n: 'C3', d: 720 }, { n: 'G2', d: 720 }, { n: 'C3', d: 720 }, { n: 'G2', d: 720 }, { n: 'C3', d: 720 }
           ]
         },
+
         '5': {
-          key: '5', title: '5 - Pachelbel / Canon in D', shortTitle: 'CANON ORCHESTRA', instrument: 'pad', color: [220, 160, 255], tempo: 1.05,
+          key: '5',
+          title: '5 - Pachelbel / Canon in D',
+          shortTitle: 'CANON ORCHESTRA',
+          instrument: 'pad',
+          color: [220, 160, 255],
+          tempo: 1.05,
           melody: [
-            { chord: ['D4', 'Fs4', 'A4'], d: 520 }, { chord: ['A3', 'Cs4', 'E4'], d: 520 }, { chord: ['B3', 'D4', 'Fs4'], d: 520 }, { chord: ['Fs3', 'A3', 'Cs4'], d: 520 },
-            { chord: ['G3', 'B3', 'D4'], d: 520 }, { chord: ['D3', 'Fs3', 'A3'], d: 520 }, { chord: ['G3', 'B3', 'D4'], d: 520 }, { chord: ['A3', 'Cs4', 'E4'], d: 520 },
-            { n: 'Fs4', d: 180 }, { n: 'E4', d: 180 }, { n: 'D4', d: 180 }, { n: 'Cs4', d: 180 }, { n: 'B3', d: 180 }, { n: 'A3', d: 180 }, { n: 'B3', d: 180 }, { n: 'Cs4', d: 180 }, { n: 'D4', d: 700 }
+            { chord: ['D4','Fs4','A4'], d: 520 }, { chord: ['A3','Cs4','E4'], d: 520 },
+            { chord: ['B3','D4','Fs4'], d: 520 }, { chord: ['Fs3','A3','Cs4'], d: 520 },
+            { chord: ['G3','B3','D4'], d: 520 }, { chord: ['D3','Fs3','A3'], d: 520 },
+            { chord: ['G3','B3','D4'], d: 520 }, { chord: ['A3','Cs4','E4'], d: 520 },
+            { n: 'Fs4', d: 180 }, { n: 'E4', d: 180 }, { n: 'D4', d: 180 }, { n: 'Cs4', d: 180 },
+            { n: 'B3', d: 180 }, { n: 'A3', d: 180 }, { n: 'B3', d: 180 }, { n: 'Cs4', d: 180 }, { n: 'D4', d: 700 }
           ],
           bass: [
             { n: 'D2', d: 520 }, { n: 'A2', d: 520 }, { n: 'B2', d: 520 }, { n: 'Fs2', d: 520 },
             { n: 'G2', d: 520 }, { n: 'D2', d: 520 }, { n: 'G2', d: 520 }, { n: 'A2', d: 520 }
           ]
         },
+
         '6': {
-          key: '6', title: '6 - Baby Shark / Built-in Synth', shortTitle: 'BABY SHARK', instrument: 'babySynth', color: [255, 210, 80], tempo: 1.0,
+          key: '6',
+          title: '6 - Baby Shark / Built-in Synth',
+          shortTitle: 'BABY SHARK',
+          instrument: 'babySynth',
+          color: [255, 210, 80],
+          tempo: 1.0,
           melody: [
             { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 180 },
             { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 260 },
@@ -231,51 +307,28 @@
             { n: 'F3', d: 360 }, { n: 'G3', d: 360 }, { n: 'C3', d: 520 }
           ]
         },
+
         'O': {
-          key: 'O', title: 'O - Katy Perry / Roar.mp3', shortTitle: 'ROAR MP3', instrument: 'mp3', color: [255, 120, 80], file: 'Katy Perry - Roar.mp3'
+          key: 'O',
+          title: 'O - Katy Perry / Roar.mp3',
+          shortTitle: 'ROAR MP3',
+          instrument: 'mp3',
+          color: [255, 120, 80],
+          file: 'Katy Perry - Roar.mp3'
         }
       };
 
-      let selectedTrackKey = '1';
-      let selectedTrack = tracks[selectedTrackKey];
-      let playingTrackKey = null;
-      let playerState = 'stopped'; // stopped / playing / paused
-      let currentSongTitle = 'No music playing';
-      let currentSongColor = [0, 255, 255];
-      let songTimers = [];
-      let activeOscillators = [];
-      let trackStartMs = 0;
-      let pauseElapsedMs = 0;
-      let audioPauseTime = 0;
-
-      let roarSound = null;
-      let roarLoadStarted = false;
-
-      let detectedFingerCount = 0;
-      let handCounts = [];
-
-      let selectionCandidate = '';
-      let selectionStableFrames = 0;
-      let lastSelectionTriggerFrame = -999;
-
-      let controlCandidate = '';
-      let controlStableFrames = 0;
-      let lastControlTriggerFrame = -999;
-
-      const SELECTION_STABLE_FRAMES = 20;
-      const CONTROL_STABLE_FRAMES = 20;
-      const SELECTION_COOLDOWN_FRAMES = 70;
-      const CONTROL_COOLDOWN_FRAMES = 70;
-      const MAX_FINGER_COUNT = 6;
-
-      let buttons = [
-        { label: 'COLOR', x: 40, y: 120, w: 90, h: 40, active: false },
-        { label: 'GLITCH', x: 40, y: 170, w: 90, h: 40, active: false }
-      ];
-
+      // =========================
+      // p5 setup
+      // =========================
       function setup() {
         createCanvas(windowWidth, windowHeight);
         mainColor = color(colors[colorIdx]);
+
+        uiOsc = new p5.Oscillator('sine');
+        uiEnv = new p5.Envelope();
+        uiEnv.setADSR(0.001, 0.05, 0.1, 0.1);
+        uiEnv.setRange(0.45, 0);
 
         avatarImg = loadImage(
           AVATAR_IMAGE_FILE,
@@ -285,17 +338,9 @@
           },
           () => {
             avatarReady = false;
-            updateLog('TOToro avatar image not found - using placeholder');
+            updateLog('AVATAR IMAGE NOT FOUND');
           }
         );
-
-        osc = new p5.Oscillator('sine');
-        envelope = new p5.Envelope();
-        envelope.setADSR(0.001, 0.05, 0.1, 0.1);
-        envelope.setRange(0.5, 0);
-
-        linkOsc = new p5.Oscillator('sawtooth');
-        linkOsc.amp(0);
 
         handPose = ml5.handPose({ flipped: true, maxHands: 2 }, () => {
           document.getElementById('loading-msg').style.display = 'none';
@@ -307,10 +352,6 @@
         textFont('Courier New');
       }
 
-      function updateLog(msg) {
-        document.getElementById('status-log').innerText = `LOG: ${msg}`;
-      }
-
       function initSystem() {
         userStartAudio();
         playBootSound();
@@ -320,7 +361,6 @@
           document.getElementById('overlay').style.display = 'none';
           startDetection();
         });
-
         video.size(640, 480);
         video.hide();
       }
@@ -335,123 +375,164 @@
         });
       }
 
-      function loadRoarSound() {
-        if (roarLoadStarted || roarSound) return;
-        roarLoadStarted = true;
-
-        roarSound = loadSound(
-          'Katy Perry - Roar.mp3',
-          () => updateLog('ROAR MP3 READY'),
-          () => {
-            roarSound = null;
-            updateLog('ROAR MP3 NOT FOUND');
-          }
-        );
+      function updateLog(msg) {
+        document.getElementById('status-log').innerText = `LOG: ${msg}`;
       }
 
-      function playTone(freq) {
-        osc.freq(freq);
-        osc.start();
-        envelope.play(osc);
+      function playUITone(freq) {
+        uiOsc.freq(freq);
+        uiOsc.start();
+        uiEnv.play(uiOsc);
       }
 
       function playBootSound() {
         let f = 300;
         let interval = setInterval(() => {
-          playTone(f);
-          f += 250;
-          if (f > 1800) clearInterval(interval);
+          playUITone(f);
+          f += 220;
+          if (f > 1600) clearInterval(interval);
         }, 50);
       }
 
+      function loadRoarSound() {
+        roarSound = loadSound(
+          'Katy Perry - Roar.mp3',
+          () => {
+            roarLoaded = true;
+            updateLog('ROAR MP3 READY');
+          },
+          () => {
+            roarLoaded = false;
+            updateLog('ROAR MP3 NOT FOUND');
+          }
+        );
+      }
+
+      // =========================
+      // 主迴圈
+      // =========================
       function draw() {
         background(10, 15, 25);
         if (!isReady) return;
 
         modelCheckTimer++;
-        if (modelCheckTimer > 180) {
-          updateLog('DETECTOR HANG DETECTED. RESTARTING...');
-          startDetection();
+        if (modelCheckTimer > 240) {
+          updateLog('DETECTOR CHECK...');
           modelCheckTimer = 0;
         }
 
-        let gx = (glitchTimer > 0) ? random(-15, 15) : 0;
-        let gy = (glitchTimer > 0) ? random(-5, 5) : 0;
-        if (glitchTimer > 0) glitchTimer--;
-
+        // 背景相機（鏡像）
         push();
-        translate(width + gx, gy);
+        translate(width, 0);
         scale(-1, 1);
-        tint(red(mainColor), green(mainColor), blue(mainColor), 50);
-        image(video, 0, 0, width, height, 0, 0, video.width, video.height, COVER);
+        tint(0, 220, 255, 28);
+        image(video, 0, 0, width, height);
+        noTint();
         pop();
 
         if (hands && hands.length > 0) {
           handCounts = hands.map(h => countExtendedFingers(h));
           detectedFingerCount = constrain(handCounts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
 
-          for (let i = 0; i < hands.length; i++) {
-            let hand = hands[i];
-            let indexTip = hand.keypoints[8];
-            let tx = map(indexTip.x, 0, 640, 0, width);
-            let ty = map(indexTip.y, 0, 480, 0, height);
+          // 先畫 avatar
+          drawAvatarHands();
 
-            checkButtons(tx, ty);
-            drawSciFiSkeleton(hand, gx, gy);
-            drawFingertips(hand, gx, gy);
-            drawHoloDial(hand, i, gx, gy);
-            drawCursor(tx, ty);
+          // 再畫手部骨架
+          for (let i = 0; i < hands.length; i++) {
+            drawHandSkeleton(hands[i]);
+            drawHandTips(hands[i]);
           }
 
+          // 控制手勢優先
           let control = detectControlGesture(hands, handCounts);
           updateControlGesture(control);
 
-          // 控制手勢優先，避免播放控制與選歌互相干擾。
           if (!control) {
             let selection = detectSelectionGesture(hands, handCounts);
             updateSelectionGesture(selection);
           } else {
             updateSelectionGesture('');
           }
-
-          if (hands.length === 2) {
-            let d = dist(
-              map(hands[0].keypoints[9].x, 0, 640, 0, width),
-              map(hands[0].keypoints[9].y, 0, 480, 0, height),
-              map(hands[1].keypoints[9].x, 0, 640, 0, width),
-              map(hands[1].keypoints[9].y, 0, 480, 0, height)
-            );
-
-            let proximity = map(d, 100, 800, 1, 0, true);
-            drawEnergyLink(hands[0], hands[1], proximity, gx, gy);
-            linkOsc.amp(map(proximity, 0, 1, 0.05, 0.5), 0.1);
-            linkOsc.freq(80 + proximity * 100);
-            linkOsc.start();
-          } else {
-            linkOsc.amp(0, 0.5);
-          }
         } else {
-          linkOsc.amp(0, 0.5);
           detectedFingerCount = 0;
           handCounts = [];
           updateSelectionGesture('');
           updateControlGesture('');
-          drawScanningUI();
+          drawAvatarHands();
+          drawScanLine();
         }
 
-        drawAvatarHands();
-        drawVirtualButtons(gx, gy);
-        drawGestureGuide();
+        drawTitleHUD();
+        drawGuideHUD();
         drawStatusHUD();
       }
 
-      // ===== 選曲手勢：數字 1 到 6，以及 O / OK =====
+      // =========================
+      // 手勢判斷
+      // =========================
+      function countExtendedFingers(hand) {
+        let kp = hand.keypoints;
+        let palm = kp[9];
+        let count = 0;
+
+        let thumbTip = kp[4];
+        let thumbIp = kp[3];
+        let thumbOpen = dist(thumbTip.x, thumbTip.y, palm.x, palm.y) > dist(thumbIp.x, thumbIp.y, palm.x, palm.y) + 18;
+        if (thumbOpen) count++;
+
+        if (kp[8].y  < kp[6].y  - 10) count++;
+        if (kp[12].y < kp[10].y - 10) count++;
+        if (kp[16].y < kp[14].y - 10) count++;
+        if (kp[20].y < kp[18].y - 10) count++;
+
+        return constrain(count, 0, 5);
+      }
+
+      function thumbAndIndexTouching(hand) {
+        let kp = hand.keypoints;
+        let thumbTip = kp[4];
+        let indexTip = kp[8];
+        let wrist = kp[0];
+        let palm = kp[9];
+        let handScale = dist(wrist.x, wrist.y, palm.x, palm.y);
+        let d = dist(thumbTip.x, thumbTip.y, indexTip.x, indexTip.y);
+        let threshold = max(22, handScale * 0.42);
+        return d < threshold;
+      }
+
+      function isFingerExtended(hand, tipIdx, pipIdx) {
+        let kp = hand.keypoints;
+        return kp[tipIdx].y < kp[pipIdx].y - 10;
+      }
+
+      // O：選 Roar
+      function isOSelectGesture(hand) {
+        if (!thumbAndIndexTouching(hand)) return false;
+
+        let middleOpen = isFingerExtended(hand, 12, 10);
+        let ringOpen = isFingerExtended(hand, 16, 14);
+        let pinkyOpen = isFingerExtended(hand, 20, 18);
+
+        return !middleOpen && !ringOpen && !pinkyOpen;
+      }
+
+      // OK：播放 / 繼續
+      function isOKPlayGesture(hand) {
+        if (!thumbAndIndexTouching(hand)) return false;
+
+        let middleOpen = isFingerExtended(hand, 12, 10);
+        let ringOpen = isFingerExtended(hand, 16, 14);
+        let pinkyOpen = isFingerExtended(hand, 20, 18);
+
+        return middleOpen && ringOpen && pinkyOpen;
+      }
+
       function detectSelectionGesture(activeHands, counts) {
-        // O 手勢：拇指與食指碰在一起，另外三根手指收起來，用來選 Roar。
         if (activeHands.some(h => isOSelectGesture(h))) return 'O';
 
         let total = constrain(counts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
         if (total >= 1 && total <= MAX_FINGER_COUNT) return String(total);
+
         return '';
       }
 
@@ -474,54 +555,15 @@
 
       function selectTrack(key) {
         selectedTrackKey = key;
-        selectedTrack = tracks[key];
-        currentSongColor = selectedTrack.color;
-        updateLog(`SELECTED ${selectedTrack.shortTitle}. USE PLAY GESTURE.`);
+        currentSongColor = tracks[key].color;
+        updateLog(`SELECTED ${tracks[key].shortTitle}. USE OK TO PLAY.`);
+        playUITone(1100);
       }
 
-      function thumbAndIndexTouching(hand) {
-        let kp = hand.keypoints;
-        let thumbTip = kp[4];
-        let indexTip = kp[8];
-        let wrist = kp[0];
-        let palm = kp[9];
-        let handScale = dist(wrist.x, wrist.y, palm.x, palm.y);
-        let thumbIndexDistance = dist(thumbTip.x, thumbTip.y, indexTip.x, indexTip.y);
-        let touchThreshold = max(22, handScale * 0.42);
-        return thumbIndexDistance < touchThreshold;
-      }
-
-      function isFingerExtended(hand, tipIdx, pipIdx) {
-        let kp = hand.keypoints;
-        return kp[tipIdx].y < kp[pipIdx].y - 10;
-      }
-
-      function isOSelectGesture(hand) {
-        // O：拇指食指碰在一起，中指、無名指、小指都收起來。
-        if (!thumbAndIndexTouching(hand)) return false;
-
-        let middleOpen = isFingerExtended(hand, 12, 10);
-        let ringOpen = isFingerExtended(hand, 16, 14);
-        let pinkyOpen = isFingerExtended(hand, 20, 18);
-
-        return !middleOpen && !ringOpen && !pinkyOpen;
-      }
-
-      function isOKPlayGesture(hand) {
-        // OK：拇指食指碰在一起，中指、無名指、小指都伸直。
-        if (!thumbAndIndexTouching(hand)) return false;
-
-        let middleOpen = isFingerExtended(hand, 12, 10);
-        let ringOpen = isFingerExtended(hand, 16, 14);
-        let pinkyOpen = isFingerExtended(hand, 20, 18);
-
-        return middleOpen && ringOpen && pinkyOpen;
-      }
-
-      // ===== 播放控制手勢 =====
-      // PLAY / RESUME：OK 手勢，拇指食指碰在一起，另外三根手指伸直。
-      // PAUSE：單手握拳，0 根手指。
-      // STOP：雙手握拳，總手指數 0。
+      // 控制手勢
+      // OK = play/resume
+      // 單手拳頭 = pause
+      // 雙手拳頭 = stop
       function detectControlGesture(activeHands, counts) {
         if (activeHands.length >= 2 && counts[0] === 0 && counts[1] === 0) return 'STOP';
 
@@ -530,6 +572,7 @@
         }
 
         if (activeHands.length === 1 && counts[0] === 0) return 'PAUSE';
+
         return '';
       }
 
@@ -552,9 +595,11 @@
         }
       }
 
-      // ===== 播放器：支援開始、暫停、停止、繼續 =====
+      // =========================
+      // 播放控制
+      // =========================
       function startOrResumeSelectedTrack() {
-        if (!selectedTrack) return;
+        if (!tracks[selectedTrackKey]) return;
 
         if (playerState === 'paused' && playingTrackKey === selectedTrackKey) {
           resumePlayback();
@@ -567,36 +612,41 @@
       function playSelectedTrackFromStart() {
         stopPlayback(false);
 
+        const track = tracks[selectedTrackKey];
         playingTrackKey = selectedTrackKey;
-        currentSongTitle = selectedTrack.title;
-        currentSongColor = selectedTrack.color;
         playerState = 'playing';
+        currentSongTitle = track.title;
+        currentSongColor = track.color;
         pauseElapsedMs = 0;
         audioPauseTime = 0;
         trackStartMs = millis();
 
-        if (selectedTrack.instrument === 'mp3') {
-          if (roarSound && roarSound.isLoaded()) {
+        if (track.instrument === 'mp3') {
+          if (roarLoaded && roarSound) {
             roarSound.stop();
             roarSound.setVolume(0.9);
             roarSound.play();
-            updateLog(`PLAYING ${selectedTrack.shortTitle}`);
+            updateLog(`PLAYING ${track.shortTitle}`);
+            playUITone(1400);
           } else {
             updateLog('ROAR MP3 NOT READY OR FILE NOT FOUND');
-            playTone(220);
+            playUITone(220);
             playerState = 'stopped';
+            playingTrackKey = null;
+            currentSongTitle = 'No music playing';
           }
           return;
         }
 
-        scheduleSynthTrack(selectedTrack, 0);
-        updateLog(`PLAYING ${selectedTrack.shortTitle}`);
+        scheduleSynthTrack(track, 0);
+        updateLog(`PLAYING ${track.shortTitle}`);
+        playUITone(1400);
       }
 
       function pausePlayback() {
         if (playerState !== 'playing') return;
 
-        let track = tracks[playingTrackKey];
+        const track = tracks[playingTrackKey];
         pauseElapsedMs = millis() - trackStartMs;
 
         clearSongTimers();
@@ -609,30 +659,33 @@
 
         playerState = 'paused';
         updateLog('PLAYBACK PAUSED');
+        playUITone(500);
       }
 
       function resumePlayback() {
         if (playerState !== 'paused' || !playingTrackKey) return;
 
-        let track = tracks[playingTrackKey];
+        const track = tracks[playingTrackKey];
         playerState = 'playing';
         trackStartMs = millis() - pauseElapsedMs;
         currentSongTitle = track.title;
         currentSongColor = track.color;
 
         if (track.instrument === 'mp3') {
-          if (roarSound && roarSound.isLoaded()) {
+          if (roarLoaded && roarSound) {
             roarSound.play(0, 1, 0.9, audioPauseTime);
             updateLog(`RESUMED ${track.shortTitle}`);
+            playUITone(1300);
           }
           return;
         }
 
         scheduleSynthTrack(track, pauseElapsedMs);
         updateLog(`RESUMED ${track.shortTitle}`);
+        playUITone(1300);
       }
 
-      function stopPlayback(showLog) {
+      function stopPlayback(showLog = true) {
         clearSongTimers();
         stopActiveOscillators();
 
@@ -646,17 +699,20 @@
         audioPauseTime = 0;
         currentSongTitle = 'No music playing';
 
-        if (showLog) updateLog('PLAYBACK STOPPED');
+        if (showLog) {
+          updateLog('PLAYBACK STOPPED');
+          playUITone(260);
+        }
       }
 
       function clearSongTimers() {
-        songTimers.forEach(timer => clearTimeout(timer));
+        songTimers.forEach(t => clearTimeout(t));
         songTimers = [];
       }
 
       function stopActiveOscillators() {
         activeOscillators.forEach(o => {
-          try { o.stop(); } catch (e) {}
+          try { o.stop(); } catch(e) {}
         });
         activeOscillators = [];
       }
@@ -664,32 +720,38 @@
       function scheduleSynthTrack(track, offsetMs) {
         clearSongTimers();
 
-        let events = buildTrackEvents(track);
+        const events = buildTrackEvents(track);
         let lastTime = 0;
 
         events.forEach(event => {
           lastTime = max(lastTime, event.time + event.dur);
           if (event.time + event.dur < offsetMs) return;
 
-          let delay = max(0, event.time - offsetMs);
-          let timer = setTimeout(() => {
+          const delay = max(0, event.time - offsetMs);
+          const timer = setTimeout(() => {
             if (playerState !== 'playing' || playingTrackKey !== track.key) return;
 
-            if (event.note) playInstrumentNote(event.freq, event.dur, event.instrument, event.volume);
-            if (event.chord) playChord(event.chord, event.dur, event.instrument, event.volume);
+            if (event.note) {
+              playInstrumentNote(event.freq, event.dur, event.instrument, event.volume);
+            }
+
+            if (event.chord) {
+              playChord(event.chord, event.dur, event.instrument, event.volume);
+            }
           }, delay);
 
           songTimers.push(timer);
         });
 
-        let endDelay = max(0, lastTime - offsetMs + 900);
-        let endTimer = setTimeout(() => {
+        const endTimer = setTimeout(() => {
           if (playerState === 'playing' && playingTrackKey === track.key) {
             playerState = 'stopped';
             playingTrackKey = null;
+            currentSongTitle = 'No music playing';
             updateLog(`${track.shortTitle} COMPLETE`);
           }
-        }, endDelay);
+        }, max(0, lastTime - offsetMs + 800));
+
         songTimers.push(endTimer);
       }
 
@@ -703,20 +765,52 @@
 
       function appendSequenceEvents(events, sequence, instrument, tempo, volume, startAt) {
         let t = startAt;
+
         sequence.forEach(step => {
-          let dur = step.d * tempo;
+          const dur = step.d * tempo;
+
           if (step.n && step.n !== 'R') {
-            events.push({ time: t, dur, instrument, volume, note: step.n, freq: NOTES[step.n] });
+            events.push({
+              time: t,
+              dur,
+              instrument,
+              volume,
+              note: step.n,
+              freq: NOTES[step.n]
+            });
           }
+
           if (step.chord) {
-            events.push({ time: t, dur, instrument, volume, chord: step.chord });
+            events.push({
+              time: t,
+              dur,
+              instrument,
+              volume,
+              chord: step.chord
+            });
           }
+
           t += dur;
+        });
+      }
+
+      function trackOsc(o) {
+        activeOscillators.push(o);
+        return o;
+      }
+
+      function playChord(noteNames, dur, instrument, volumeScale = 1) {
+        noteNames.forEach((name, i) => {
+          const timer = setTimeout(() => {
+            playInstrumentNote(NOTES[name], dur, instrument, volumeScale * 0.75);
+          }, i * 24);
+          songTimers.push(timer);
         });
       }
 
       function playInstrumentNote(freq, dur, instrument, volumeScale = 1) {
         if (!freq) return;
+
         if (instrument === 'piano') playPianoNote(freq, dur, volumeScale);
         else if (instrument === 'violin') playViolinNote(freq, dur, volumeScale);
         else if (instrument === 'harpsichord') playHarpsichordNote(freq, dur, volumeScale);
@@ -724,18 +818,6 @@
         else if (instrument === 'pad') playPadNote(freq, dur, volumeScale);
         else if (instrument === 'babySynth') playBabySynthNote(freq, dur, volumeScale);
         else if (instrument === 'bass') playBassNote(freq, dur, volumeScale);
-      }
-
-      function playChord(noteNames, dur, instrument, volumeScale = 1) {
-        noteNames.forEach((name, i) => {
-          let timer = setTimeout(() => playInstrumentNote(NOTES[name], dur, instrument, volumeScale * 0.75), i * 24);
-          songTimers.push(timer);
-        });
-      }
-
-      function trackOsc(o) {
-        activeOscillators.push(o);
-        return o;
       }
 
       function playPianoNote(freq, dur, volumeScale = 1) {
@@ -752,7 +834,9 @@
         s2.amp(0.10 * volumeScale);
         env.play(s1);
 
-        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 650);
+        setTimeout(() => {
+          try { s1.stop(); s2.stop(); } catch(e) {}
+        }, dur + 650);
       }
 
       function playViolinNote(freq, dur, volumeScale = 1) {
@@ -769,7 +853,9 @@
         s2.amp(0.055 * volumeScale);
         env.play(s1);
 
-        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 700);
+        setTimeout(() => {
+          try { s1.stop(); s2.stop(); } catch(e) {}
+        }, dur + 700);
       }
 
       function playHarpsichordNote(freq, dur, volumeScale = 1) {
@@ -782,7 +868,9 @@
         s.start();
         env.play(s);
 
-        setTimeout(() => s.stop(), dur + 350);
+        setTimeout(() => {
+          try { s.stop(); } catch(e) {}
+        }, dur + 350);
       }
 
       function playStringNote(freq, dur, volumeScale = 1) {
@@ -799,7 +887,9 @@
         s2.amp(0.08 * volumeScale);
         env.play(s1);
 
-        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 650);
+        setTimeout(() => {
+          try { s1.stop(); s2.stop(); } catch(e) {}
+        }, dur + 650);
       }
 
       function playPadNote(freq, dur, volumeScale = 1) {
@@ -816,7 +906,9 @@
         s2.amp(0.08 * volumeScale);
         env.play(s1);
 
-        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 1200);
+        setTimeout(() => {
+          try { s1.stop(); s2.stop(); } catch(e) {}
+        }, dur + 1200);
       }
 
       function playBabySynthNote(freq, dur, volumeScale = 1) {
@@ -833,7 +925,9 @@
         s2.amp(0.08 * volumeScale);
         env.play(s1);
 
-        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 420);
+        setTimeout(() => {
+          try { s1.stop(); s2.stop(); } catch(e) {}
+        }, dur + 420);
       }
 
       function playBassNote(freq, dur, volumeScale = 1) {
@@ -846,29 +940,14 @@
         s.start();
         env.play(s);
 
-        setTimeout(() => s.stop(), dur + 450);
+        setTimeout(() => {
+          try { s.stop(); } catch(e) {}
+        }, dur + 450);
       }
 
-      // ===== 手指計數 =====
-      function countExtendedFingers(hand) {
-        let count = 0;
-        let kp = hand.keypoints;
-        let palm = kp[9];
-
-        let thumbTip = kp[4];
-        let thumbIp = kp[3];
-        let thumbOpen = dist(thumbTip.x, thumbTip.y, palm.x, palm.y) > dist(thumbIp.x, thumbIp.y, palm.x, palm.y) + 18;
-        if (thumbOpen) count++;
-
-        if (kp[8].y < kp[6].y - 10) count++;
-        if (kp[12].y < kp[10].y - 10) count++;
-        if (kp[16].y < kp[14].y - 10) count++;
-        if (kp[20].y < kp[18].y - 10) count++;
-
-        return constrain(count, 0, 5);
-      }
-
-      // ===== 圖片動物跟著手勢動：整隻手使用圖片裁切，不再用程式畫手 =====
+      // =========================
+      // Avatar：整隻圖片手臂跟著動
+      // =========================
       function drawAvatarHands() {
         let avatarH = min(height * 0.60, height - 250, 660);
         avatarH = max(300, avatarH);
@@ -877,17 +956,16 @@
         let avatarX = width / 2 - avatarW / 2;
         let avatarY = 72;
 
-        // 肩膀位置：配合 BODY_SPRITE 的裁切比例微調
-        let leftShoulder =  { x: avatarX + avatarW * 0.30, y: avatarY + avatarH * 0.39 };
-        let rightShoulder = { x: avatarX + avatarW * 0.70, y: avatarY + avatarH * 0.39 };
+        let body = getBodyEllipseInfo(avatarX, avatarY, avatarW, avatarH);
 
-        // 沒偵測到手時，圖片手臂回到原本姿勢附近
-        let leftRest =  { x: avatarX + avatarW * 0.18, y: avatarY + avatarH * 0.37 };
-        let rightRest = { x: avatarX + avatarW * 0.86, y: avatarY + avatarH * 0.33 };
+        // 閒置位置
+        let leftIdleTarget = pointOnBodyEllipse(body, LEFT_ARM_ANGLE_RANGE.idle, avatarW * 0.10);
+        let rightIdleTarget = pointOnBodyEllipse(body, RIGHT_ARM_ANGLE_RANGE.idle, avatarW * 0.10);
 
-        let leftTarget = { ...leftRest };
-        let rightTarget = { ...rightRest };
+        let leftRawTarget = { ...leftIdleTarget };
+        let rightRawTarget = { ...rightIdleTarget };
 
+        // 使用者左右手位置
         if (hands && hands.length > 0) {
           hands.forEach(hand => {
             let palm = hand.keypoints[9] || hand.keypoints[0];
@@ -895,36 +973,108 @@
             let ty = map(palm.y, 0, 480, 0, height);
 
             if (tx < width / 2) {
-              leftTarget = { x: tx, y: ty };
+              leftRawTarget = { x: tx, y: ty };
             } else {
-              rightTarget = { x: tx, y: ty };
+              rightRawTarget = { x: tx, y: ty };
             }
           });
         }
 
-        leftTarget = limitArmReach(leftShoulder, leftTarget, avatarW * 0.42);
-        rightTarget = limitArmReach(rightShoulder, rightTarget, avatarW * 0.42);
+        // 先依方向取得接點
+        let leftShoulder = getRoundedBodyAnchor(body, 'left', leftRawTarget);
+        let rightShoulder = getRoundedBodyAnchor(body, 'right', rightRawTarget);
 
-        if (!avatarLeftPaw) avatarLeftPaw = { x: leftRest.x, y: leftRest.y };
-        if (!avatarRightPaw) avatarRightPaw = { x: rightRest.x, y: rightRest.y };
+        // 限制手臂最長距離
+        let leftTarget = limitArmReach(leftShoulder, leftRawTarget, avatarW * 0.42);
+        let rightTarget = limitArmReach(rightShoulder, rightRawTarget, avatarW * 0.42);
+
+        // 重新依限制後的方向再算接點
+        leftShoulder = getRoundedBodyAnchor(body, 'left', leftTarget);
+        rightShoulder = getRoundedBodyAnchor(body, 'right', rightTarget);
+
+        if (!avatarLeftPaw) avatarLeftPaw = { x: leftTarget.x, y: leftTarget.y };
+        if (!avatarRightPaw) avatarRightPaw = { x: rightTarget.x, y: rightTarget.y };
 
         avatarLeftPaw.x = lerp(avatarLeftPaw.x, leftTarget.x, 0.22);
         avatarLeftPaw.y = lerp(avatarLeftPaw.y, leftTarget.y, 0.22);
+
         avatarRightPaw.x = lerp(avatarRightPaw.x, rightTarget.x, 0.22);
         avatarRightPaw.y = lerp(avatarRightPaw.y, rightTarget.y, 0.22);
 
-        if (avatarReady) {
-          // 先畫整隻手臂貼圖，讓手臂在身體後方移動
-          drawArmSprite(avatarImg, LEFT_ARM_SPRITE, leftShoulder, avatarLeftPaw, avatarW, avatarH, -1);
-          drawArmSprite(avatarImg, RIGHT_ARM_SPRITE, rightShoulder, avatarRightPaw, avatarW, avatarH, 1);
+        // 用平滑後位置重算一次接點
+        leftShoulder = getRoundedBodyAnchor(body, 'left', avatarLeftPaw);
+        rightShoulder = getRoundedBodyAnchor(body, 'right', avatarRightPaw);
 
-          // 再畫中央身體裁切，遮住原本靜態手臂，避免看起來有兩組手
+        if (avatarReady) {
+          // 先畫整隻手臂（在後面）
+          drawArmSprite(avatarImg, LEFT_ARM_SPRITE, leftShoulder, avatarLeftPaw, avatarW, avatarH);
+          drawArmSprite(avatarImg, RIGHT_ARM_SPRITE, rightShoulder, avatarRightPaw, avatarW, avatarH);
+
+          // 再畫身體（蓋住接縫）
           drawBodySprite(avatarImg, BODY_SPRITE, avatarX, avatarY, avatarW, avatarH);
         } else {
           drawAvatarPlaceholder(avatarX, avatarY, avatarW, avatarH);
         }
 
         drawAvatarLinkHUD(avatarX, avatarY, avatarW);
+      }
+
+      function getBodyEllipseInfo(avatarX, avatarY, avatarW, avatarH) {
+        return {
+          cx: avatarX + avatarW * BODY_ELLIPSE.cx,
+          cy: avatarY + avatarH * BODY_ELLIPSE.cy,
+          rx: avatarW * BODY_ELLIPSE.rx,
+          ry: avatarH * BODY_ELLIPSE.ry
+        };
+      }
+
+      function normalizeAngleDeg(a) {
+        while (a > 180) a -= 360;
+        while (a < -180) a += 360;
+        return a;
+      }
+
+      function clampAngleDeg(a, minA, maxA) {
+        a = normalizeAngleDeg(a);
+        return constrain(a, minA, maxA);
+      }
+
+      function pointOnBodyEllipse(body, angleDeg, outwardOffset = 0) {
+        let x = body.cx + body.rx * cos(angleDeg);
+        let y = body.cy + body.ry * sin(angleDeg);
+
+        let dx = x - body.cx;
+        let dy = y - body.cy;
+        let len = max(1, sqrt(dx * dx + dy * dy));
+
+        return {
+          x: x + (dx / len) * outwardOffset,
+          y: y + (dy / len) * outwardOffset
+        };
+      }
+
+      function getRoundedBodyAnchor(body, side, target) {
+        let angle = atan2(target.y - body.cy, target.x - body.cx);
+
+        if (side === 'left') {
+          angle = clampAngleDeg(angle, LEFT_ARM_ANGLE_RANGE.min, LEFT_ARM_ANGLE_RANGE.max);
+        } else {
+          angle = clampAngleDeg(angle, RIGHT_ARM_ANGLE_RANGE.min, RIGHT_ARM_ANGLE_RANGE.max);
+        }
+
+        let x = body.cx + body.rx * cos(angle);
+        let y = body.cy + body.ry * sin(angle);
+
+        // 稍微埋進身體裡，讓接縫更自然
+        let dx = x - body.cx;
+        let dy = y - body.cy;
+        let len = max(1, sqrt(dx * dx + dy * dy));
+
+        let inset = 8;
+        return {
+          x: x - (dx / len) * inset,
+          y: y - (dy / len) * inset
+        };
       }
 
       function limitArmReach(shoulder, target, maxLen) {
@@ -958,7 +1108,7 @@
         image(imgRef, dx, dy, dw, dh, sx, sy, sw, sh);
       }
 
-      function drawArmSprite(imgRef, crop, shoulder, paw, avatarW, avatarH, side) {
+      function drawArmSprite(imgRef, crop, shoulder, paw, avatarW, avatarH) {
         let sx = imgRef.width * crop.x;
         let sy = imgRef.height * crop.y;
         let sw = imgRef.width * crop.w;
@@ -967,20 +1117,22 @@
         let drawW = avatarW * crop.w;
         let drawH = avatarH * crop.h;
 
-        // 這兩點都是裁切圖片內的比例座標
         let pivotX = crop.pivot.x * drawW;
         let pivotY = crop.pivot.y * drawH;
+
         let handleX = crop.handle.x * drawW;
         let handleY = crop.handle.y * drawH;
 
-        // 原圖中手臂方向，以及目前追蹤到的手掌方向
+        // 原始裁圖中，手臂的方向
         let sourceAngle = atan2(handleY - pivotY, handleX - pivotX);
+
+        // 目前目標方向
         let targetAngle = atan2(paw.y - shoulder.y, paw.x - shoulder.x);
         let rotateDelta = targetAngle - sourceAngle;
 
         let sourceLen = dist(pivotX, pivotY, handleX, handleY);
         let targetLen = dist(shoulder.x, shoulder.y, paw.x, paw.y);
-        let stretch = constrain(targetLen / max(sourceLen, 1), 0.72, 1.35);
+        let stretch = constrain(targetLen / max(sourceLen, 1), 0.80, 1.25);
 
         push();
         imageMode(CORNER);
@@ -988,11 +1140,11 @@
         rotate(rotateDelta);
         scale(stretch, stretch);
 
-        // 把裁切圖的肩膀 pivot 對齊到螢幕上的 shoulder
+        // 讓裁圖裡的 pivot 對齊身體接點
         image(imgRef, -pivotX, -pivotY, drawW, drawH, sx, sy, sw, sh);
         pop();
 
-        // 追蹤提示圈，不是手，只是提示目前手掌控制位置
+        // 控制點提示圈（不是手）
         noFill();
         stroke(0, 255, 255, 120);
         strokeWeight(2);
@@ -1018,6 +1170,7 @@
         fill(0);
         circle(-w * 0.18, -h * 0.25, 14);
         circle(w * 0.18, -h * 0.25, 14);
+
         pop();
       }
 
@@ -1037,228 +1190,137 @@
         pop();
       }
 
-      // ===== 視覺效果 =====
-      function drawEnergyLink(h1, h2, k, gx, gy) {
-        let p1x = map(h1.keypoints[9].x, 0, 640, 0, width) + gx;
-        let p1y = map(h1.keypoints[9].y, 0, 480, 0, height) + gy;
-        let p2x = map(h2.keypoints[9].x, 0, 640, 0, width) + gx;
-        let p2y = map(h2.keypoints[9].y, 0, 480, 0, height) + gy;
-
-        let linkColor = lerpColor(mainColor, color(255, 0, 0), k);
-        strokeWeight(1 + k * 14);
-        stroke(linkColor);
-        beginShape();
-        noFill();
-        for (let t = 0; t <= 1; t += 0.05) {
-          vertex(lerp(p1x, p2x, t) + random(-k * 20, k * 20), lerp(p1y, p2y, t) + random(-k * 20, k * 20));
-        }
-        endShape();
-        fill(255);
-        noStroke();
-        circle((p1x + p2x) / 2, (p1y + p2y) / 2, 15 + k * 30);
-      }
-
-      function drawHoloDial(hand, id, gx, gy) {
-        let wrist = hand.keypoints[0], middle = hand.keypoints[9];
-        let targetX = map(wrist.x, 0, 640, 0, width);
-        let targetY = map(wrist.y, 0, 480, 0, height);
-        let angle = atan2(middle.y - wrist.y, middle.x - wrist.x) + 90;
-
-        smoothedAngle[id] = lerp(smoothedAngle[id] || 0, angle, 0.15);
-        smoothedPos[id].x = lerp(smoothedPos[id].x || targetX, targetX, 0.2);
-        smoothedPos[id].y = lerp(smoothedPos[id].y || targetY, targetY, 0.2);
-
-        if (abs(smoothedAngle[id] - lastTickAngle[id]) >= 15) {
-          playTone(1600);
-          lastTickAngle[id] = smoothedAngle[id];
-        }
-
-        push();
-        translate(smoothedPos[id].x + gx, smoothedPos[id].y + gy);
-        rotate(smoothedAngle[id]);
-        noFill();
-        stroke(mainColor);
-        strokeWeight(2);
-        arc(0, 0, 130, 130, -40, 220);
-        for (let i = 0; i < 12; i++) {
-          rotate(30);
-          stroke(mainColor, 100);
-          line(50, 0, 58, 0);
-        }
-        fill(255, 50, 80);
-        noStroke();
-        triangle(75, 0, 65, -5, 65, 5);
-        pop();
-
-        fill(255);
-        textAlign(CENTER);
-        textSize(24);
-        text(`${int(smoothedAngle[id])}°`, smoothedPos[id].x + gx, smoothedPos[id].y + gy + 10);
-      }
-
-      function checkButtons(x, y) {
-        buttons.forEach(btn => {
-          let isInside = x > btn.x && x < btn.x + btn.w && y > btn.y && y < btn.y + btn.h;
-          if (isInside && !btn.active) {
-            btn.active = true;
-            playTone(1000);
-            if (btn.label === 'COLOR') {
-              colorIdx = (colorIdx + 1) % colors.length;
-              mainColor = color(colors[colorIdx]);
-            } else if (btn.label === 'GLITCH') {
-              glitchTimer = 25;
-              playTone(150);
-            }
-          } else if (!isInside) {
-            btn.active = false;
-          }
-        });
-      }
-
-      function drawSciFiSkeleton(hand, gx, gy) {
-        stroke(red(mainColor), green(mainColor), blue(mainColor), 80);
-        let connections = handPose.getConnections();
-        for (let i = 0; i < connections.length; i++) {
-          let a = connections[i][0], b = connections[i][1];
-          line(
-            map(hand.keypoints[a].x, 0, 640, 0, width) + gx,
-            map(hand.keypoints[a].y, 0, 480, 0, height) + gy,
-            map(hand.keypoints[b].x, 0, 640, 0, width) + gx,
-            map(hand.keypoints[b].y, 0, 480, 0, height) + gy
-          );
-        }
-      }
-
-      function drawFingertips(hand, gx, gy) {
-        let tips = [
-          { idx: 4, label: 'THUMB' },
-          { idx: 8, label: 'INDEX' },
-          { idx: 12, label: 'MIDDLE' },
-          { idx: 16, label: 'RING' },
-          { idx: 20, label: 'PINKY' }
+      // =========================
+      // 手部視覺
+      // =========================
+      function drawHandSkeleton(hand) {
+        let connections = [
+          [0,1],[1,2],[2,3],[3,4],
+          [0,5],[5,6],[6,7],[7,8],
+          [5,9],[9,10],[10,11],[11,12],
+          [9,13],[13,14],[14,15],[15,16],
+          [13,17],[17,18],[18,19],[19,20],
+          [0,17]
         ];
 
-        tips.forEach(item => {
-          let k = hand.keypoints[item.idx];
-          let x = map(k.x, 0, 640, 0, width) + gx;
-          let y = map(k.y, 0, 480, 0, height) + gy;
+        stroke(0,255,255,115);
+        strokeWeight(2);
 
-          noFill();
-          stroke(255, 180);
+        connections.forEach(pair => {
+          let a = hand.keypoints[pair[0]];
+          let b = hand.keypoints[pair[1]];
+          let ax = map(a.x, 0, 640, 0, width);
+          let ay = map(a.y, 0, 480, 0, height);
+          let bx = map(b.x, 0, 640, 0, width);
+          let by = map(b.y, 0, 480, 0, height);
+          line(ax, ay, bx, by);
+        });
+      }
+
+      function drawHandTips(hand) {
+        let tips = [4,8,12,16,20];
+        noFill();
+        stroke(255, 190);
+        strokeWeight(1.5);
+
+        tips.forEach(idx => {
+          let k = hand.keypoints[idx];
+          let x = map(k.x, 0, 640, 0, width);
+          let y = map(k.y, 0, 480, 0, height);
           circle(x, y, 14);
-          fill(255, 150);
-          noStroke();
-          textSize(9);
-          textAlign(LEFT, CENTER);
-          text(item.label, x + 14, y - 8);
         });
       }
 
-      function drawVirtualButtons(gx, gy) {
-        buttons.forEach(btn => {
-          push();
-          translate(btn.x + gx / 3, btn.y + gy / 3);
-          noFill();
-          stroke(mainColor, 150);
-          rect(0, 0, btn.w, btn.h, 2);
-          if (btn.active) {
-            fill(red(mainColor), green(mainColor), blue(mainColor), 80);
-            rect(0, 0, btn.w, btn.h);
-          }
-          fill(btn.active ? 255 : mainColor);
-          textAlign(CENTER, CENTER);
-          textSize(11);
-          text(btn.label, btn.w / 2, btn.h / 2);
-          pop();
-        });
+      // =========================
+      // HUD
+      // =========================
+      function drawTitleHUD() {
+        push();
+        fill(255);
+        textAlign(CENTER, CENTER);
+        textSize(18);
+        text('Gesture Music + Totoro Hand Control', width / 2, 24);
+        pop();
       }
 
-      function drawGestureGuide() {
-        let panelW = 930;
-        let panelH = 124;
-        let startX = width / 2 - panelW / 2;
-        let startY = height - 142;
-        let cellW = panelW / 7;
+      function drawGuideHUD() {
+        let panelW = min(1100, width - 40);
+        let panelH = 132;
+        let x = width / 2 - panelW / 2;
+        let y = height - panelH - 18;
 
         push();
         noFill();
-        stroke(mainColor, 120);
-        rect(startX, startY, panelW, panelH, 8);
+        stroke(0,255,255,120);
+        rect(x, y, panelW, panelH, 8);
+        fill(0,255,255,24);
+        rect(x, y, panelW, panelH, 8);
 
-        fill(255, 190);
+        fill(255);
         noStroke();
         textAlign(CENTER, CENTER);
         textSize(10);
-        text('SELECT MUSIC: show number 1-6, or make O gesture for Roar. Then use OK / fist controls to play, pause, or stop.', width / 2, startY - 14);
 
-        let keys = ['1', '2', '3', '4', '5', '6', 'O'];
+        text('選曲：數字 1~6 | O 手勢 = Roar.mp3', x + panelW/2, y + 18);
+        text('播放控制：OK 手勢 = 播放 / 繼續 | 單手握拳 = 暫停 | 雙手握拳 = 停止', x + panelW/2, y + 38);
+        text('角色互動：左手控制左手，右手控制右手；手臂接點會沿著圓形身體邊界滑動', x + panelW/2, y + 58);
+
+        const keys = ['1','2','3','4','5','6','O'];
+        const cellW = panelW / keys.length;
+
         keys.forEach((key, i) => {
-          let track = tracks[key];
-          let x = startX + i * cellW;
-          let c = track.color;
-          let selected = selectedTrackKey === key;
+          const tr = tracks[key];
+          const c = tr.color;
+          const selected = selectedTrackKey === key;
 
-          stroke(c[0], c[1], c[2], selected ? 255 : 140);
-          fill(selected ? color(c[0], c[1], c[2], 70) : color(0, 0, 0, 0));
-          rect(x + 6, startY + 8, cellW - 12, 74, 4);
+          stroke(c[0], c[1], c[2], selected ? 255 : 130);
+          fill(selected ? color(c[0], c[1], c[2], 60) : color(0,0,0,0));
+          rect(x + i * cellW + 6, y + 74, cellW - 12, 46, 4);
 
-          fill(c[0], c[1], c[2], 230);
+          fill(c[0], c[1], c[2], 255);
           noStroke();
-          textSize(22);
-          text(key, x + cellW / 2, startY + 27);
+          textSize(16);
+          text(key, x + i * cellW + cellW / 2, y + 90);
 
           fill(255);
           textSize(8);
-          text(track.shortTitle, x + cellW / 2, startY + 55);
-
-          fill(255, 155);
-          textSize(8);
-          text(track.instrument.toUpperCase(), x + cellW / 2, startY + 70);
+          text(tr.shortTitle, x + i * cellW + cellW / 2, y + 108);
         });
 
-        fill(255, 190);
-        textSize(10);
-        text('CONTROL: OK sign = PLAY / RESUME     1 fist = PAUSE     2 fists = STOP', width / 2, startY + 102);
         pop();
       }
 
       function drawStatusHUD() {
-        push();
-        translate(width - 330, 40);
         let c = currentSongColor;
+
+        push();
+        translate(width - 340, 46);
         noFill();
         stroke(c[0], c[1], c[2], 180);
-        rect(0, 0, 290, 128, 4);
-        fill(c[0], c[1], c[2], 60);
-        rect(0, 0, 290, 128, 4);
+        rect(0, 0, 300, 134, 4);
+
+        fill(c[0], c[1], c[2], 48);
+        rect(0, 0, 300, 134, 4);
 
         fill(255);
         noStroke();
         textAlign(CENTER, CENTER);
         textSize(10);
-        text('GESTURE MUSIC CONTROLLER', 145, 16);
+        text('SYSTEM STATUS', 150, 16);
 
-        fill(255, 220);
         textSize(9);
-        text(`SELECTED: ${selectedTrack.shortTitle}`, 145, 40);
-        text(`STATE: ${playerState.toUpperCase()}`, 145, 60);
-        text(`NOW: ${currentSongTitle}`, 145, 80);
-        text(`COUNT: ${detectedFingerCount}    CONTROL: ${controlCandidate || '-'}`, 145, 100);
-        text(`SELECT STABLE: ${selectionStableFrames}/${SELECTION_STABLE_FRAMES}`, 145, 116);
+        text(`SELECTED : ${tracks[selectedTrackKey].shortTitle}`, 150, 38);
+        text(`STATE    : ${playerState.toUpperCase()}`, 150, 58);
+        text(`NOW      : ${currentSongTitle}`, 150, 78);
+        text(`COUNT    : ${detectedFingerCount}`, 150, 98);
+        text(`CONTROL  : ${controlCandidate || '-'}`, 150, 114);
         pop();
       }
 
-      function drawCursor(tx, ty) {
-        fill(255);
-        circle(tx, ty, 6);
-        noFill();
-        stroke(mainColor);
-        circle(tx, ty, 20 + sin(frameCount * 10) * 5);
-      }
-
-      function drawScanningUI() {
-        stroke(mainColor, 60);
-        line(0, (frameCount * 4) % height, width, (frameCount * 4) % height);
+      function drawScanLine() {
+        stroke(0,255,255,70);
+        let sy = (frameCount * 4) % height;
+        line(0, sy, width, sy);
       }
 
       function windowResized() {
