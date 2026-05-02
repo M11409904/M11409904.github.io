@@ -116,22 +116,26 @@
       let modelCheckTimer = 0;
 
       // ===== 新增：手勢音樂系統 =====
-      let gestureOsc, gestureEnv;
+      let gestureLeadOsc, gestureBassOsc, gestureLeadEnv, gestureBassEnv;
       let isGestureMusicPlaying = false;
       let musicTimer = null;
-      let melodyIndex = 0;
+      let musicStep = 0;
+      let musicPulse = 0;
 
-      // 這是一段簡單的科幻電子旋律，可自行調整 freq 與 dur
-      let gestureMelody = [
-        { freq: 220, dur: 160 },
-        { freq: 330, dur: 160 },
-        { freq: 440, dur: 160 },
-        { freq: 660, dur: 220 },
-        { freq: 550, dur: 160 },
-        { freq: 440, dur: 160 },
-        { freq: 330, dur: 220 },
-        { freq: 660, dur: 300 }
+      // 更明顯的科幻合成器旋律：高音主旋律 + 低音節奏
+      let gestureLeadMelody = [
+        440, 554, 659, 880,
+        784, 659, 554, 440,
+        330, 392, 494, 659,
+        587, 494, 392, 330
       ];
+
+      let gestureBassMelody = [
+        110, 110, 147, 147,
+        165, 165, 131, 131
+      ];
+
+      const MUSIC_STEP_MS = 190;
 
       let buttons = [
         { label: 'COLOR', x: 40, y: 120, w: 90, h: 40, active: false },
@@ -153,12 +157,20 @@
         linkOsc.amp(0);
 
         // 新增：偵測到手時播放的旋律音源
-        gestureOsc = new p5.Oscillator('triangle');
-        gestureOsc.amp(0);
+        // square 比 triangle 更明顯，sawtooth 用來做低音節奏
+        gestureLeadOsc = new p5.Oscillator('square');
+        gestureLeadOsc.amp(0);
 
-        gestureEnv = new p5.Envelope();
-        gestureEnv.setADSR(0.02, 0.08, 0.25, 0.2);
-        gestureEnv.setRange(0.18, 0);
+        gestureBassOsc = new p5.Oscillator('sawtooth');
+        gestureBassOsc.amp(0);
+
+        gestureLeadEnv = new p5.Envelope();
+        gestureLeadEnv.setADSR(0.005, 0.05, 0.35, 0.08);
+        gestureLeadEnv.setRange(0.38, 0);
+
+        gestureBassEnv = new p5.Envelope();
+        gestureBassEnv.setADSR(0.005, 0.08, 0.25, 0.12);
+        gestureBassEnv.setRange(0.24, 0);
         
         handPose = ml5.handPose({ flipped: true, maxHands: 2 }, () => {
           document.getElementById('loading-msg').style.display = 'none';
@@ -218,24 +230,35 @@
         if (isGestureMusicPlaying) return;
 
         isGestureMusicPlaying = true;
-        melodyIndex = 0;
+        musicStep = 0;
+        musicPulse = 45;
 
-        gestureOsc.start();
-        updateLog("GESTURE MUSIC ONLINE");
+        gestureLeadOsc.start();
+        gestureBassOsc.start();
+        updateLog("GESTURE MUSIC ACTIVE");
 
-        playGestureNote();
+        playGestureStep();
       }
 
-      function playGestureNote() {
+      function playGestureStep() {
         if (!isGestureMusicPlaying) return;
 
-        let note = gestureMelody[melodyIndex % gestureMelody.length];
+        let leadFreq = gestureLeadMelody[musicStep % gestureLeadMelody.length];
+        let bassFreq = gestureBassMelody[floor(musicStep / 2) % gestureBassMelody.length];
 
-        gestureOsc.freq(note.freq);
-        gestureEnv.play(gestureOsc);
+        // 主旋律每一步播放
+        gestureLeadOsc.freq(leadFreq);
+        gestureLeadEnv.play(gestureLeadOsc);
 
-        melodyIndex++;
-        musicTimer = setTimeout(playGestureNote, note.dur);
+        // 低音每兩步播放一次，讓節奏更有存在感
+        if (musicStep % 2 === 0) {
+          gestureBassOsc.freq(bassFreq);
+          gestureBassEnv.play(gestureBassOsc);
+        }
+
+        musicPulse = 45;
+        musicStep++;
+        musicTimer = setTimeout(playGestureStep, MUSIC_STEP_MS);
       }
 
       function stopGestureMusic() {
@@ -248,7 +271,8 @@
           musicTimer = null;
         }
 
-        gestureOsc.amp(0, 0.4);
+        gestureLeadOsc.amp(0, 0.3);
+        gestureBassOsc.amp(0, 0.3);
         updateLog("GESTURE MUSIC STANDBY");
       }
 
@@ -316,6 +340,9 @@
         }
 
         drawVirtualButtons(gx, gy);
+        drawMusicStatus();
+
+        if (musicPulse > 0) musicPulse--;
       }
 
       function drawEnergyLink(h1, h2, k, gx, gy) {
@@ -400,7 +427,8 @@
 
               // 新增：GLITCH 時讓手勢旋律短暫變慢，增加故障感
               if (isGestureMusicPlaying) {
-                gestureOsc.freq(90);
+                gestureLeadOsc.freq(90);
+                gestureBassOsc.freq(55);
               }
             }
           } else if (!isInside) {
@@ -475,6 +503,32 @@
       function drawScanningUI() {
         stroke(mainColor, 60);
         line(0, (frameCount * 4) % height, width, (frameCount * 4) % height);
+      }
+
+      function drawMusicStatus() {
+        if (!isGestureMusicPlaying) return;
+
+        let pulseSize = 10 + musicPulse * 0.35;
+
+        push();
+        translate(width - 190, 40);
+        noFill();
+        stroke(0, 255, 255, 160);
+        rect(0, 0, 150, 42, 4);
+
+        fill(0, 255, 255, 70);
+        rect(0, 0, 150, 42, 4);
+
+        fill(255);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textSize(11);
+        text("MUSIC ACTIVE", 75, 21);
+
+        noFill();
+        stroke(255, 255, 255, 160);
+        circle(18, 21, pulseSize);
+        pop();
       }
 
       function windowResized() {
