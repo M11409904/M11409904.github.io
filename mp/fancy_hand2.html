@@ -211,11 +211,10 @@
         6: {
           title: '6 - Baby Shark',
           shortTitle: 'BABY SHARK',
-          instrument: 'audio',
+          instrument: 'babySynth',
           color: [255, 210, 80],
           tempo: 1.0,
-          // 備援旋律：如果沒有 baby_shark.mp3，會播放這段鯊魚主題合成器旋律。
-          // 若要像真正的 Baby Shark，請把音檔命名為 baby_shark.mp3，放在 html 同一個資料夾。
+          // 內建 Baby Shark 風格合成器旋律，不需要任何 mp3 / wav 音檔。
           melody: [
             { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 180 },
             { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 260 },
@@ -242,11 +241,6 @@
       let currentSongTimers = [];
       let songPlayingFrames = 0;
 
-      // Baby Shark 音檔播放設定
-      // 請把 baby_shark.mp3 放在這個 html 檔案同一個資料夾。
-      let babySharkSound = null;
-      let babySharkLoadStarted = false;
-      let babySharkLoadFailed = false;
 
       const COUNT_STABLE_FRAMES = 22;
       const SONG_TRIGGER_COOLDOWN_FRAMES = 90;
@@ -474,10 +468,6 @@
       }
 
       function playSong(song) {
-        if (song.instrument === 'audio') {
-          playBabySharkAudioOrFallback(song);
-          return;
-        }
 
         let melodyTotal = scheduleSequence(song.melody, song.instrument, 0, song.tempo, 1.0);
 
@@ -532,6 +522,8 @@
           playStringNote(freq, dur, volumeScale);
         } else if (instrument === 'pad') {
           playPadNote(freq, dur, volumeScale);
+        } else if (instrument === 'babySynth') {
+          playBabySynthNote(freq, dur, volumeScale);
         } else if (instrument === 'bass') {
           playBassNote(freq, dur, volumeScale);
         }
@@ -634,6 +626,27 @@
           s1.stop();
           s2.stop();
         }, dur + 1200);
+      }
+
+      function playBabySynthNote(freq, dur, volumeScale = 1) {
+        // Baby Shark 內建音色：明亮、可愛、像玩具琴的合成器聲
+        let env = new p5.Envelope();
+        env.setADSR(0.001, 0.06, 0.18, 0.18);
+        env.setRange(0.48 * volumeScale, 0);
+
+        let s1 = new p5.Oscillator('square');
+        let s2 = new p5.Oscillator('triangle');
+        s1.freq(freq);
+        s2.freq(freq * 2.0);
+        s1.start();
+        s2.start();
+        s2.amp(0.08 * volumeScale);
+        env.play(s1);
+
+        setTimeout(() => {
+          s1.stop();
+          s2.stop();
+        }, dur + 420);
       }
 
       function playBassNote(freq, dur, volumeScale = 1) {
@@ -800,11 +813,11 @@
       }
 
       function drawSongPanel() {
-        let panelW = 760;
+        let panelW = 900;
         let panelH = 92;
         let startX = width / 2 - panelW / 2;
         let startY = height - 112;
-        let cellW = panelW / 5;
+        let cellW = panelW / MAX_FINGER_COUNT;
 
         push();
         noFill();
@@ -815,9 +828,9 @@
         noStroke();
         textAlign(CENTER, CENTER);
         textSize(10);
-        text('FINGER NUMBER MUSIC MODE: show 1 / 2 / 3 / 4 / 5 fingers and hold briefly to play a full phrase', width / 2, startY - 14);
+        text('FINGER NUMBER MUSIC MODE: show 1 / 2 / 3 / 4 / 5 / 6 fingers and hold briefly to play a full phrase', width / 2, startY - 14);
 
-        for (let i = 1; i <= 5; i++) {
+        for (let i = 1; i <= MAX_FINGER_COUNT; i++) {
           let song = fingerSongMap[i];
           let x = startX + (i - 1) * cellW;
           let c = song.color;
