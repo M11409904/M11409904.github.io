@@ -207,6 +207,27 @@
             { n: 'D2', d: 520 }, { n: 'A2', d: 520 }, { n: 'B2', d: 520 }, { n: 'Fs2', d: 520 },
             { n: 'G2', d: 520 }, { n: 'D2', d: 520 }, { n: 'G2', d: 520 }, { n: 'A2', d: 520 }
           ]
+        },
+        6: {
+          title: '6 - Baby Shark',
+          shortTitle: 'BABY SHARK',
+          instrument: 'audio',
+          color: [255, 210, 80],
+          tempo: 1.0,
+          // 備援旋律：如果沒有 baby_shark.mp3，會播放這段鯊魚主題合成器旋律。
+          // 若要像真正的 Baby Shark，請把音檔命名為 baby_shark.mp3，放在 html 同一個資料夾。
+          melody: [
+            { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 180 },
+            { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 260 },
+            { n: 'E5', d: 180 }, { n: 'F5', d: 180 }, { n: 'G5', d: 240 }, { n: 'E5', d: 180 },
+            { n: 'F5', d: 180 }, { n: 'G5', d: 320 },
+            { n: 'G5', d: 140 }, { n: 'A5', d: 140 }, { n: 'G5', d: 140 }, { n: 'E5', d: 140 },
+            { n: 'C5', d: 360 }
+          ],
+          bass: [
+            { n: 'C3', d: 360 }, { n: 'G3', d: 360 }, { n: 'C3', d: 360 }, { n: 'G3', d: 360 },
+            { n: 'F3', d: 360 }, { n: 'G3', d: 360 }, { n: 'C3', d: 520 }
+          ]
         }
       };
 
@@ -221,8 +242,15 @@
       let currentSongTimers = [];
       let songPlayingFrames = 0;
 
+      // Baby Shark 音檔播放設定
+      // 請把 baby_shark.mp3 放在這個 html 檔案同一個資料夾。
+      let babySharkSound = null;
+      let babySharkLoadStarted = false;
+      let babySharkLoadFailed = false;
+
       const COUNT_STABLE_FRAMES = 22;
       const SONG_TRIGGER_COOLDOWN_FRAMES = 90;
+      const MAX_FINGER_COUNT = 6;
 
       let buttons = [
         { label: 'COLOR', x: 40, y: 120, w: 90, h: 40, active: false },
@@ -332,8 +360,8 @@
             drawCursor(tx, ty);
           }
 
-          // 只用第一隻偵測到的手判斷 1 到 5
-          updateFingerCountTrigger(hands[0]);
+          // 使用雙手合計判斷 1 到 6；例如一手 5 根 + 另一手 1 根 = 6
+          updateFingerCountTrigger(hands);
 
           if (hands.length === 2) {
             let d = dist(
@@ -369,8 +397,8 @@
       }
 
       // ===== 判斷伸出幾根手指 =====
-      function updateFingerCountTrigger(hand) {
-        detectedFingerCount = countExtendedFingers(hand);
+      function updateFingerCountTrigger(activeHands) {
+        detectedFingerCount = countTotalExtendedFingers(activeHands);
 
         if (detectedFingerCount === countCandidate) {
           countStableFrames++;
@@ -380,7 +408,7 @@
         }
 
         let isStable = countStableFrames > COUNT_STABLE_FRAMES;
-        let inRange = detectedFingerCount >= 1 && detectedFingerCount <= 5;
+        let inRange = detectedFingerCount >= 1 && detectedFingerCount <= MAX_FINGER_COUNT;
         let cooledDown = frameCount - lastSongTriggerFrame > SONG_TRIGGER_COOLDOWN_FRAMES;
 
         if (isStable && inRange && cooledDown && detectedFingerCount !== lastTriggeredCount) {
@@ -393,6 +421,16 @@
         if (detectedFingerCount === 0 && isStable) {
           lastTriggeredCount = 0;
         }
+      }
+
+      function countTotalExtendedFingers(activeHands) {
+        let total = 0;
+
+        for (let i = 0; i < activeHands.length; i++) {
+          total += countExtendedFingers(activeHands[i]);
+        }
+
+        return constrain(total, 0, MAX_FINGER_COUNT);
       }
 
       function countExtendedFingers(hand) {
@@ -436,6 +474,11 @@
       }
 
       function playSong(song) {
+        if (song.instrument === 'audio') {
+          playBabySharkAudioOrFallback(song);
+          return;
+        }
+
         let melodyTotal = scheduleSequence(song.melody, song.instrument, 0, song.tempo, 1.0);
 
         if (song.bass) {
