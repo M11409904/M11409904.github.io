@@ -4,7 +4,8 @@ class ChatBot {
         // ⚠️ Important: Replace with your n8n webhook URL
         // ****************************************************************
         //this.webhookUrl = 'https://你的帳號.app.n8n.cloud/webhook/chatb';
-        http://localhost:5678/webhook/chatb
+        //http://localhost:5678/webhook/chatb
+        https://scouts-clerical-lid.ngrok-free.dev//webhook/chatb
         // ****************************************************************        
         // Initialize session ID
         this.sessionId = this.getOrCreateSessionId();
