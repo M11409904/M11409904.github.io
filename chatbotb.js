@@ -732,7 +732,7 @@ class ChatBot {
                     <div class="chatbot-header">
                         <div class="chatbot-title">
                             <span class="title-icon">🎓</span>
-                            <span>欒老師AI課程聊天BOT</span>
+                            <span>M11409904 AI課程聊天BOT</span>
                         </div>
                         <div class="chatbot-header-buttons">
                             <button class="chatbot-btn clear-btn" id="clearChatBtn" title="Clear chat history">
@@ -1058,7 +1058,7 @@ class ChatBot {
         if (recentHistory.length === 0) {
             // If no history, show welcome message
             setTimeout(() => {
-                this.addMessage('你好！我是欒老師的AI課程助手。有任何問題嗎？', 'ai');
+                this.addMessage('你好！我是M11409904的AI課程助手。有任何問題嗎？', 'ai');
             }, 1000);
         }
     }
