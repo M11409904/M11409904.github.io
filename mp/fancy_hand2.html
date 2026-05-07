@@ -119,33 +119,12 @@
       let osc, envelope, linkOsc;
       let modelCheckTimer = 0;
 
-      // ===== 圖片動物手勢同步系統 =====
-      // 把去背景的龍貓圖另存為 totoro_cutout.png，並放在 HTML 同一個資料夾。
-      // 這版不再用程式創造手臂 / 手掌，而是直接從圖片裁出「整隻手」當作動態貼圖。
+      // ===== 靜態圖片角色 =====
+      // 圖片固定不動，只保留音樂手勢控制。
+      // 請把去背景的龍貓圖另存為 totoro_cutout.png，並放在 HTML 同一個資料夾。
       let avatarImg = null;
       let avatarReady = false;
-      let avatarLeftPaw = null;
-      let avatarRightPaw = null;
       const AVATAR_IMAGE_FILE = 'totoro_cutout.png';
-
-      // 從去背龍貓圖中裁出「整隻左手」與「整隻右手」的比例位置。
-      // x / y / w / h 是裁切範圍；pivot 是肩膀旋轉點；handle 是手掌末端追蹤點。
-      const LEFT_ARM_SPRITE = {
-        x: 0.00, y: 0.02, w: 0.38, h: 0.47,
-        pivot:  { x: 0.78, y: 0.76 },
-        handle: { x: 0.55, y: 0.78 }
-      };
-
-      const RIGHT_ARM_SPRITE = {
-        x: 0.66, y: 0.22, w: 0.31, h: 0.28,
-        pivot:  { x: 0.02, y: 0.48 },
-        handle: { x: 0.78, y: 0.24 }
-      };
-
-      // 中央身體裁切，避免原圖靜態手臂留在畫面上。
-      const BODY_SPRITE = {
-        x: 0.29, y: 0.13, w: 0.50, h: 0.83
-      };
 
       const NOTES = {
         C2: 65.41, Cs2: 69.30, D2: 73.42, Ds2: 77.78, E2: 82.41, F2: 87.31, Fs2: 92.50, G2: 98.00, Gs2: 103.83, A2: 110.00, As2: 116.54, B2: 123.47,
@@ -218,21 +197,12 @@
           ]
         },
         '6': {
-          key: '6', title: '6 - Baby Shark / Built-in Synth', shortTitle: 'BABY SHARK', instrument: 'babySynth', color: [255, 210, 80], tempo: 1.0,
-          melody: [
-            { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 180 },
-            { n: 'C5', d: 180 }, { n: 'D5', d: 180 }, { n: 'E5', d: 180 }, { n: 'C5', d: 260 },
-            { n: 'E5', d: 180 }, { n: 'F5', d: 180 }, { n: 'G5', d: 240 }, { n: 'E5', d: 180 },
-            { n: 'F5', d: 180 }, { n: 'G5', d: 320 },
-            { n: 'G5', d: 140 }, { n: 'A5', d: 140 }, { n: 'G5', d: 140 }, { n: 'E5', d: 140 }, { n: 'C5', d: 360 }
-          ],
-          bass: [
-            { n: 'C3', d: 360 }, { n: 'G3', d: 360 }, { n: 'C3', d: 360 }, { n: 'G3', d: 360 },
-            { n: 'F3', d: 360 }, { n: 'G3', d: 360 }, { n: 'C3', d: 520 }
-          ]
-        },
-        'O': {
-          key: 'O', title: 'O - Katy Perry / Roar.mp3', shortTitle: 'ROAR MP3', instrument: 'mp3', color: [255, 120, 80], file: 'Katy Perry - Roar.mp3'
+          key: '6',
+          title: '6 - Katy Perry / Roar.mp3',
+          shortTitle: 'ROAR MP3',
+          instrument: 'mp3',
+          color: [255, 120, 80],
+          file: 'Katy Perry - Roar.mp3'
         }
       };
 
@@ -285,7 +255,7 @@
           },
           () => {
             avatarReady = false;
-            updateLog('TOToro avatar image not found - using placeholder');
+            updateLog('TOTORO AVATAR IMAGE NOT FOUND - USING PLACEHOLDER');
           }
         );
 
@@ -445,11 +415,10 @@
         drawStatusHUD();
       }
 
-      // ===== 選曲手勢：數字 1 到 6，以及 O / OK =====
+      // ===== 選曲手勢：只用數字 1 到 6 =====
+      // 1~5 選內建樂曲，6 選 Katy Perry - Roar.mp3。
+      // O 已移除，不再當作選曲手勢。OK 只用於播放 / 繼續播放。
       function detectSelectionGesture(activeHands, counts) {
-        // O 手勢：拇指與食指碰在一起，另外三根手指收起來，用來選 Roar。
-        if (activeHands.some(h => isOSelectGesture(h))) return 'O';
-
         let total = constrain(counts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
         if (total >= 1 && total <= MAX_FINGER_COUNT) return String(total);
         return '';
@@ -476,7 +445,7 @@
         selectedTrackKey = key;
         selectedTrack = tracks[key];
         currentSongColor = selectedTrack.color;
-        updateLog(`SELECTED ${selectedTrack.shortTitle}. USE PLAY GESTURE.`);
+        updateLog(`SELECTED ${selectedTrack.shortTitle}. USE OK GESTURE TO PLAY.`);
       }
 
       function thumbAndIndexTouching(hand) {
@@ -494,17 +463,6 @@
       function isFingerExtended(hand, tipIdx, pipIdx) {
         let kp = hand.keypoints;
         return kp[tipIdx].y < kp[pipIdx].y - 10;
-      }
-
-      function isOSelectGesture(hand) {
-        // O：拇指食指碰在一起，中指、無名指、小指都收起來。
-        if (!thumbAndIndexTouching(hand)) return false;
-
-        let middleOpen = isFingerExtended(hand, 12, 10);
-        let ringOpen = isFingerExtended(hand, 16, 14);
-        let pinkyOpen = isFingerExtended(hand, 20, 18);
-
-        return !middleOpen && !ringOpen && !pinkyOpen;
       }
 
       function isOKPlayGesture(hand) {
@@ -722,7 +680,6 @@
         else if (instrument === 'harpsichord') playHarpsichordNote(freq, dur, volumeScale);
         else if (instrument === 'strings') playStringNote(freq, dur, volumeScale);
         else if (instrument === 'pad') playPadNote(freq, dur, volumeScale);
-        else if (instrument === 'babySynth') playBabySynthNote(freq, dur, volumeScale);
         else if (instrument === 'bass') playBassNote(freq, dur, volumeScale);
       }
 
@@ -819,23 +776,6 @@
         setTimeout(() => { s1.stop(); s2.stop(); }, dur + 1200);
       }
 
-      function playBabySynthNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.001, 0.06, 0.18, 0.18);
-        env.setRange(0.48 * volumeScale, 0);
-
-        let s1 = trackOsc(new p5.Oscillator('square'));
-        let s2 = trackOsc(new p5.Oscillator('triangle'));
-        s1.freq(freq);
-        s2.freq(freq * 2.0);
-        s1.start();
-        s2.start();
-        s2.amp(0.08 * volumeScale);
-        env.play(s1);
-
-        setTimeout(() => { s1.stop(); s2.stop(); }, dur + 420);
-      }
-
       function playBassNote(freq, dur, volumeScale = 1) {
         let env = new p5.Envelope();
         env.setADSR(0.005, 0.06, 0.25, 0.16);
@@ -868,7 +808,7 @@
         return constrain(count, 0, 5);
       }
 
-      // ===== 圖片動物跟著手勢動：整隻手使用圖片裁切，不再用程式畫手 =====
+      // ===== 靜態圖片顯示 =====
       function drawAvatarHands() {
         let avatarH = min(height * 0.60, height - 250, 660);
         avatarH = max(300, avatarH);
@@ -907,78 +847,6 @@
         pop();
       }
 
-      function limitArmReach(shoulder, target, maxLen) {
-        let dx = target.x - shoulder.x;
-        let dy = target.y - shoulder.y;
-        let d = sqrt(dx * dx + dy * dy);
-
-        if (d > maxLen) {
-          let k = maxLen / d;
-          return {
-            x: shoulder.x + dx * k,
-            y: shoulder.y + dy * k
-          };
-        }
-
-        return target;
-      }
-
-      function drawBodySprite(imgRef, crop, avatarX, avatarY, avatarW, avatarH) {
-        let sx = imgRef.width * crop.x;
-        let sy = imgRef.height * crop.y;
-        let sw = imgRef.width * crop.w;
-        let sh = imgRef.height * crop.h;
-
-        let dx = avatarX + avatarW * crop.x;
-        let dy = avatarY + avatarH * crop.y;
-        let dw = avatarW * crop.w;
-        let dh = avatarH * crop.h;
-
-        imageMode(CORNER);
-        image(imgRef, dx, dy, dw, dh, sx, sy, sw, sh);
-      }
-
-      function drawArmSprite(imgRef, crop, shoulder, paw, avatarW, avatarH, side) {
-        let sx = imgRef.width * crop.x;
-        let sy = imgRef.height * crop.y;
-        let sw = imgRef.width * crop.w;
-        let sh = imgRef.height * crop.h;
-
-        let drawW = avatarW * crop.w;
-        let drawH = avatarH * crop.h;
-
-        // 這兩點都是裁切圖片內的比例座標
-        let pivotX = crop.pivot.x * drawW;
-        let pivotY = crop.pivot.y * drawH;
-        let handleX = crop.handle.x * drawW;
-        let handleY = crop.handle.y * drawH;
-
-        // 原圖中手臂方向，以及目前追蹤到的手掌方向
-        let sourceAngle = atan2(handleY - pivotY, handleX - pivotX);
-        let targetAngle = atan2(paw.y - shoulder.y, paw.x - shoulder.x);
-        let rotateDelta = targetAngle - sourceAngle;
-
-        let sourceLen = dist(pivotX, pivotY, handleX, handleY);
-        let targetLen = dist(shoulder.x, shoulder.y, paw.x, paw.y);
-        let stretch = constrain(targetLen / max(sourceLen, 1), 0.72, 1.35);
-
-        push();
-        imageMode(CORNER);
-        translate(shoulder.x, shoulder.y);
-        rotate(rotateDelta);
-        scale(stretch, stretch);
-
-        // 把裁切圖的肩膀 pivot 對齊到螢幕上的 shoulder
-        image(imgRef, -pivotX, -pivotY, drawW, drawH, sx, sy, sw, sh);
-        pop();
-
-        // 追蹤提示圈，不是手，只是提示目前手掌控制位置
-        noFill();
-        stroke(0, 255, 255, 120);
-        strokeWeight(2);
-        circle(paw.x, paw.y, 48 + sin(frameCount * 8) * 3);
-      }
-
       function drawAvatarPlaceholder(x, y, w, h) {
         push();
         translate(x + w / 2, y + h / 2);
@@ -998,22 +866,6 @@
         fill(0);
         circle(-w * 0.18, -h * 0.25, 14);
         circle(w * 0.18, -h * 0.25, 14);
-        pop();
-      }
-
-      function drawAvatarLinkHUD(x, y, w) {
-        push();
-        translate(x + w / 2 - 150, y - 42);
-        noFill();
-        stroke(0, 255, 255, 160);
-        rect(0, 0, 300, 32, 4);
-        fill(0, 255, 255, 45);
-        rect(0, 0, 300, 32, 4);
-        fill(255);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(10);
-        text('IMAGE ARM SPRITE LINK ACTIVE', 150, 16);
         pop();
       }
 
@@ -1154,11 +1006,12 @@
       }
 
       function drawGestureGuide() {
-        let panelW = 930;
+        let panelW = 850;
         let panelH = 124;
         let startX = width / 2 - panelW / 2;
         let startY = height - 142;
-        let cellW = panelW / 7;
+        let keys = ['1', '2', '3', '4', '5', '6'];
+        let cellW = panelW / keys.length;
 
         push();
         noFill();
@@ -1169,9 +1022,8 @@
         noStroke();
         textAlign(CENTER, CENTER);
         textSize(10);
-        text('SELECT MUSIC: show number 1-6, or make O gesture for Roar. Then use OK / fist controls to play, pause, or stop.', width / 2, startY - 14);
+        text('SELECT MUSIC: numbers 1-5 = built-in music, number 6 = Roar.mp3. Use OK / fist controls to play, pause, or stop.', width / 2, startY - 14);
 
-        let keys = ['1', '2', '3', '4', '5', '6', 'O'];
         keys.forEach((key, i) => {
           let track = tracks[key];
           let x = startX + i * cellW;
