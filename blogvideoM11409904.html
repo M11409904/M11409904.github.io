@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宏碁公司組織變革報告 - M11409904</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;400;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        acer: {
+                            light: '#83b81a',
+                            DEFAULT: '#6fb022',
+                            dark: '#5a8f1b',
+                        },
+                        dark: {
+                            900: '#0a0a0a',
+                            800: '#121212',
+                            700: '#1f1f1f',
+                        },
+                        gold: '#d4af37',
+                    },
+                    fontFamily: {
+                        sans: ['Noto Sans TC', 'sans-serif'],
+                        display: ['Outfit', 'Noto Sans TC', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #f3f4f6;
+            overflow-x: hidden;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #83b81a 0%, #ffffff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .acer-gradient {
+            background: linear-gradient(135deg, #6fb022 0%, #4a7516 100%);
+        }
+        .timeline-dot {
+            position: relative;
+        }
+        .timeline-dot::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            width: 2px;
+            height: 40px;
+            background: linear-gradient(to bottom, #6fb022, transparent);
+            transform: translateX(-50%);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #6fb022;
+        }
+    </style>
+</head>
+<body class="custom-scrollbar">
+
+    <!-- Header Section -->
+    <header class="relative pt-12 pb-8 px-6 text-center overflow-hidden">
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full h-96 bg-acer/10 blur-[120px] rounded-full -z-10"></div>
+        <div class="inline-block px-4 py-1 mb-4 rounded-full border border-acer/30 bg-acer/5 text-acer text-xs font-bold tracking-widest uppercase animate-pulse">
+            Corporate Evolution Report
+        </div>
+        <h1 class="text-4xl md:text-6xl font-display font-extrabold tracking-tight mb-4 leading-tight">
+            宏碁公司的組織變革<br/><span class="gradient-text">過程與成果報告</span>
+        </h1>
+        <p class="text-gray-400 max-w-2xl mx-auto text-sm md:text-base font-light">
+            從製造導向、品牌導向，到現今的多元價值導向。探索 Acer 半世紀以來如何透過四次重大轉型，在變動的科技產業中屹立不搖。
+        </p>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 md:px-8 space-y-24 pb-24">
+
+        <!-- 1. 置頂：資訊圖表 Section -->
+        <section class="space-y-8">
+            <div class="flex items-center space-x-4 mb-2">
+                <div class="h-px flex-1 bg-gradient-to-r from-transparent to-acer/50"></div>
+                <h2 class="text-xl font-display font-bold text-acer tracking-wide uppercase italic">Visual Infographic</h2>
+                <div class="h-px flex-1 bg-gradient-to-l from-transparent to-acer/50"></div>
+            </div>
+            
+            <div class="relative group">
+                <div class="absolute -inset-1 bg-gradient-to-r from-acer to-blue-500 rounded-[26px] blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+                <div class="relative bg-dark-800 rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
+                    <img src='https://opal.google/board/blobs/1d673a3d-d0ac-4281-a42a-e23a7215a84b' alt='Acer 組織變革資訊圖表' class="w-full h-auto object-cover transform transition duration-700 hover:scale-[1.01]" />
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="glass-card p-5 hover:bg-white/5 transition-colors">
+                    <span class="text-acer font-display font-bold text-lg">01</span>
+                    <h3 class="font-bold text-white mt-1">1992-2001</h3>
+                    <p class="text-xs text-gray-400 mt-2">初期轉型：品牌與代工分家，實施「速食店模式」與全球本土化。</p>
+                </div>
+                <div class="glass-card p-5 hover:bg-white/5 transition-colors">
+                    <span class="text-acer font-display font-bold text-lg">02</span>
+                    <h3 class="font-bold text-white mt-1">2005-2011</h3>
+                    <p class="text-xs text-gray-400 mt-2">擴張危機：追求規模經濟，併購 Gateway 但面臨平板崛起與通路積壓。</p>
+                </div>
+                <div class="glass-card p-5 hover:bg-white/5 transition-colors">
+                    <span class="text-acer font-display font-bold text-lg">03</span>
+                    <h2 class="font-bold text-white mt-1">2013-2019</h2>
+                    <p class="text-xs text-gray-400 mt-2">第三次再造：提倡自建雲 (BYOC) 與電競品牌 Predator，重塑毛利結構。</p>
+                </div>
+                <div class="glass-card p-5 hover:bg-white/5 transition-colors">
+                    <span class="text-acer font-display font-bold text-lg">04</span>
+                    <h3 class="font-bold text-white mt-1">2020-Present</h3>
+                    <p class="text-xs text-gray-400 mt-2">多元成長：推動小虎隊上市、AI PC 佈局及 ESG 永續環保轉型。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 置中：短影片 Section -->
+        <section class="space-y-8 flex flex-col items-center">
+            <div class="flex items-center space-x-4 w-full mb-2">
+                <div class="h-px flex-1 bg-gradient-to-r from-transparent to-acer/50"></div>
+                <h2 class="text-xl font-display font-bold text-acer tracking-wide uppercase italic">Video Highlight</h2>
+                <div class="h-px flex-1 bg-gradient-to-l from-transparent to-acer/50"></div>
+            </div>
+
+            <div class="w-full max-w-4xl relative">
+                <div class="aspect-video glass-card overflow-hidden relative shadow-2xl group border border-acer/20">
+                    <video src='https://opal.google/board/blobs/8f33a4b6-078b-4deb-b846-283a32763b18' controls class="w-full h-full object-cover"></video>
+                </div>
+                
+                <!-- Audio Player Styling -->
+                <div class="mt-6 glass-card p-4 flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 border-acer/30">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 acer-gradient rounded-full flex items-center justify-center animate-pulse">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8v4l4-2-4-2z"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-white">建議背景音樂</p>
+                            <p class="text-xs text-gray-500">Suggested Soundtrack</p>
+                        </div>
+                    </div>
+                    <audio src='https://opal.google/board/blobs/4824bf19-15ab-47c4-94fe-90024e4295c0' controls class="h-8 opacity-80 hover:opacity-100 transition-opacity"></audio>
+                </div>
+            </div>
+
+            <!-- Video Summary Bento -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl">
+                <div class="bg-dark-700/50 p-6 rounded-2xl border border-white/5 flex gap-4">
+                    <div class="text-2xl">🌐</div>
+                    <div>
+                        <h4 class="font-bold text-white mb-1">全球連接</h4>
+                        <p class="text-sm text-gray-400">數位地球象徵早期的全球分裝與本土化策略。</p>
+                    </div>
+                </div>
+                <div class="bg-dark-700/50 p-6 rounded-2xl border border-white/5 flex gap-4">
+                    <div class="text-2xl">🚀</div>
+                    <div>
+                        <h4 class="font-bold text-white mb-1">快速擴張</h4>
+                        <p class="text-sm text-gray-400">高速數據流象徵規模經濟的極致成長與競爭。</p>
+                    </div>
+                </div>
+                <div class="bg-dark-700/50 p-6 rounded-2xl border border-white/5 flex gap-4">
+                    <div class="text-2xl">⚡</div>
+                    <div>
+                        <h4 class="font-bold text-white mb-1">雲端與電競</h4>
+                        <p class="text-sm text-gray-400">Predator 品牌與 BYOC 象徵獲利模式的成功轉向。</p>
+                    </div>
+                </div>
+                <div class="bg-dark-700/50 p-6 rounded-2xl border border-white/5 flex gap-4">
+                    <div class="text-2xl">🍃</div>
+                    <div>
+                        <h4 class="font-bold text-white mb-1">永續與 AI</h4>
+                        <p class="text-sm text-gray-400">ESG 策略與 AI PC 介面展現未來科技企業新藍圖。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. 置底：報告內容 Section -->
+        <section class="space-y-12">
+            <div class="flex items-center space-x-4 mb-2">
+                <div class="h-px flex-1 bg-gradient-to-r from-transparent to-acer/50"></div>
+                <h2 class="text-xl font-display font-bold text-acer tracking-wide uppercase italic">Full Report</h2>
+                <div class="h-px flex-1 bg-gradient-to-l from-transparent to-acer/50"></div>
+            </div>
+
+            <!-- Summary Box -->
+            <div class="glass-card p-8 border-l-4 border-l-acer">
+                <h3 class="text-2xl font-display font-bold text-white mb-6 flex items-center">
+                    <span class="mr-3">📋</span> 摘要
+                </h3>
+                <ul class="space-y-4">
+                    <li class="flex items-start">
+                        <span class="w-2 h-2 rounded-full bg-acer mt-2 mr-3 flex-shrink-0"></span>
+                        <p class="text-gray-300 leading-relaxed"><strong class="text-white">初期轉型：</strong>採行「速食店模式」及「全球品牌、結合地緣」，最終實施「世紀大分家」解決代工衝突。</p>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-2 h-2 rounded-full bg-acer mt-2 mr-3 flex-shrink-0"></span>
+                        <p class="text-gray-300 leading-relaxed"><strong class="text-white">擴張與修正：</strong>蘭奇時期快速擴大市佔，卻因忽略行動裝置轉型導致嚴重虧損與通路庫存危機。</p>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-2 h-2 rounded-full bg-acer mt-2 mr-3 flex-shrink-0"></span>
+                        <p class="text-gray-300 leading-relaxed"><strong class="text-white">第三次再造：</strong>陳俊聖接掌後，轉向「自建雲」與電競 Predator 垂直產業鏈，成功翻轉形象。</p>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-2 h-2 rounded-full bg-acer mt-2 mr-3 flex-shrink-0"></span>
+                        <p class="text-gray-300 leading-relaxed"><strong class="text-white">現階段佈局：</strong>推動「小虎隊」多重成長引擎，深耕 AI PC 與 ESG 永續，轉型為生活風格企業。</p>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Detailed Content -->
+            <div class="space-y-16 text-gray-300">
+                <!-- Chapter 1 -->
+                <div class="relative pl-8 border-l border-white/10">
+                    <div class="absolute -left-1.5 top-0 w-3 h-3 rounded-full bg-acer shadow-[0_0_10px_rgba(111,176,34,0.8)]"></div>
+                    <h4 class="text-2xl font-bold text-white mb-6">一、 背景與初期轉型：解決代工與品牌的矛盾 (1992-2001)</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-white/5 p-6 rounded-2xl hover:bg-white/10 transition-colors">
+                            <h5 class="text-acer font-bold mb-2">速食店模式</h5>
+                            <p class="text-sm">台灣生產零件，全球組裝點按訂單組裝，有效縮短前置時間。</p>
+                        </div>
+                        <div class="bg-white/5 p-6 rounded-2xl hover:bg-white/10 transition-colors">
+                            <h5 class="text-acer font-bold mb-2">本土化 (Localization)</h5>
+                            <p class="text-sm">「全球品牌、結合地緣」，由當地專業人士經營並在當地上市。</p>
+                        </div>
+                        <div class="bg-white/5 p-6 rounded-2xl hover:bg-white/10 transition-colors">
+                            <h5 class="text-acer font-bold mb-2">世紀大分家</h5>
+                            <p class="text-sm">切割為宏碁(品牌)、緯創(代工)與明基(零組件)，開啟專業分工。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chapter 2 -->
+                <div class="relative pl-8 border-l border-white/10">
+                    <div class="absolute -left-1.5 top-0 w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)]"></div>
+                    <h4 class="text-2xl font-bold text-white mb-6">二、 蘭奇時期的極致擴張與衰退 (2005-2011)</h4>
+                    <div class="prose prose-invert max-w-none">
+                        <p class="mb-4">隨著蘭奇（Gianfranco Lanci）上任，宏碁進入了追求規模經濟的高度擴張期：</p>
+                        <ul class="list-disc pl-6 space-y-4 mb-6">
+                            <li><strong class="text-white">經銷商模式：</strong>捨棄直銷，併購 Gateway 與 Packard Bell，躍升全球 PC 前三強。</li>
+                            <li><strong class="text-white">危機爆發：</strong>iPad 興起致小筆電市場萎縮，宏碁因過度依賴傳統通路導致 2011 年爆發庫存積壓與呆帳危機，面臨單季鉅額虧損。</li>
+                        </ul>
+                        <div class="bg-red-500/10 border border-red-500/20 p-4 rounded-xl italic text-red-200 text-sm">
+                            此階段標誌著「重視規模（Scale）」而非「價值（Value）」的模式遭遇挑戰。
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chapter 3 -->
+                <div class="relative pl-8 border-l border-white/10">
+                    <div class="absolute -left-1.5 top-0 w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]"></div>
+                    <h4 class="text-2xl font-bold text-white mb-6">三、 藍天計畫與第三次轉型 (2013-2019)</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="glass-card p-6">
+                            <h5 class="text-blue-400 font-bold mb-4 flex items-center">
+                                <span class="text-2xl mr-2">☁️</span> 自建雲 (BYOC)
+                            </h5>
+                            <p class="text-sm">提出「硬體 + 軟體 + 服務」願景，延伸產品價值鏈，由施振榮回歸後提拔陳俊聖執行企業再造。</p>
+                        </div>
+                        <div class="glass-card p-6 border-blue-500/20">
+                            <h5 class="text-blue-400 font-bold mb-4 flex items-center">
+                                <span class="text-2xl mr-2">🎯</span> 精品化與電競
+                            </h5>
+                            <p class="text-sm">發展 Predator（掠奪者）子品牌，擺脫低價競爭，成功建立高毛利、高端品牌形象。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chapter 4 -->
+                <div class="relative pl-8 border-l border-white/10">
+                    <div class="absolute -left-1.5 top-0 w-3 h-3 rounded-full bg-acer shadow-[0_0_10px_rgba(111,176,34,0.8)]"></div>
+                    <h4 class="text-2xl font-bold text-white mb-6">四、 多重成長引擎與數位轉型 (2020-至今)</h4>
+                    <div class="space-y-6">
+                        <div class="flex items-center space-x-4 bg-dark-700 rounded-2xl p-6 border border-white/5">
+                            <div class="text-3xl">🐅</div>
+                            <div>
+                                <h5 class="text-white font-bold">老虎艦隊策略 (Tiger League)</h5>
+                                <p class="text-sm mt-1">孵化子公司（如宏碁資訊、安碁資訊等）上市，形成多重成長引擎，分散 PC 市場波動風險。</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="p-6 rounded-2xl border border-acer/20 bg-acer/5">
+                                <h5 class="text-acer font-bold mb-2">AI PC 與 數位轉型</h5>
+                                <p class="text-sm">佈局生成式 AI 市場，整合 AI 功能至終端裝置，協助企業數位轉型。</p>
+                            </div>
+                            <div class="p-6 rounded-2xl border border-acer/20 bg-acer/5">
+                                <h5 class="text-acer font-bold mb-2">ESG 永續發展</h5>
+                                <p class="text-sm">推出 Vero 系列環保產品，強調永續性（Sustainability），成為在歐美標案中的核心競爭力。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conclusion & References -->
+                <div class="mt-20 pt-12 border-t border-white/10">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+                        <div>
+                            <h4 class="text-xl font-bold text-white mb-4">簡要結論</h4>
+                            <p class="text-gray-400 leading-relaxed italic">
+                                宏碁的變革歷程是一場從「製造導向」走向「品牌導向」，再到「價值導向」的過程。目前在陳俊聖的帶領下，成功轉向多元引擎發展，透過子公司孵化與 AI、永續科技的結合，展現了強大的抗風險能力與商業模式轉型的成果。
+                            </p>
+                        </div>
+                        <div class="glass-card p-6">
+                            <h4 class="text-lg font-bold text-white mb-4">引用文獻來源</h4>
+                            <ul class="text-xs text-gray-500 space-y-2">
+                                <li>1. 宏碁公司。2024。《宏碁永續報告書》。</li>
+                                <li>2. 施振榮。2021。《王道經營》。天下文化出版。</li>
+                                <li>3. 商業周刊。2023。〈宏碁艦隊揭秘：陳俊聖如何把宏碁變成分身各個上市的孵化器？〉。</li>
+                                <li>4. Acer Official Investor Relations Materials, 2023-2024.</li>
+                                <li>5. Statista. 2024. Global PC market share reports.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer / Signature -->
+        <div class="flex flex-col items-center justify-center space-y-4 py-12 border-t border-white/5">
+            <div class="text-gray-500 text-sm">
+                【主題探索報告】by <span class="italic text-red-500 font-bold">NTUST M11409904</span>
+            </div>
+            <div class="text-xs tracking-tighter text-gray-700 font-display">
+                STUDENT ID: M11409904
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Scroll Progress Bar -->
+    <div id="progress" class="fixed top-0 left-0 h-1 bg-acer z-50 transition-all duration-300" style="width: 0%"></div>
+
+    <script>
+        window.onscroll = function() {
+            let winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            let height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            let scrolled = (winScroll / height) * 100;
+            document.getElementById("progress").style.width = scrolled + "%";
+        };
+    </script>
+</body>
+</html>
