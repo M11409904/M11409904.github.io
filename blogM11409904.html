@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acer 轉型之路：從電腦製造商到生活玩家</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ghibli: {
+                            sky: '#87CEEB',
+                            grass: '#567d46',
+                            wood: '#8b5a2b',
+                            cloud: '#fdfdfd',
+                            accent: '#e67e22',
+                            deepBlue: '#1a3a5f',
+                            paper: '#f9f5e7'
+                        }
+                    },
+                    fontFamily: {
+                        display: ['"ZCOOL KuaiLe"', 'cursive'],
+                        sans: ['"Noto Sans TC"', 'sans-serif'],
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'sway': 'sway 8s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        sway: {
+                            '0%, 100%': { transform: 'rotate(-1deg)' },
+                            '50%': { transform: 'rotate(1deg)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f0f4f8;
+            background-image: radial-gradient(#d1e5f0 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        .ghibli-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            border: 2px solid #ffffff;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            border-radius: 24px;
+            transition: transform 0.3s ease;
+        }
+        .ghibli-card:hover {
+            transform: translateY(-5px);
+        }
+        .section-tag {
+            display: inline-block;
+            padding: 4px 16px;
+            background: #e67e22;
+            color: white;
+            border-radius: 99px;
+            font-size: 0.875rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+        .smile-curve {
+            position: relative;
+            height: 100px;
+            width: 100%;
+            border-bottom: 4px solid #567d46;
+            border-radius: 0 0 50% 50%;
+            margin-top: -50px;
+        }
+        .banner-container img {
+            width: 100%;
+            height: auto;
+            border-radius: 0 0 40px 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .tiger-badge {
+            background: #fdf2f2;
+            border: 1px solid #fee2e2;
+            color: #991b1b;
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #1a3a5f 0%, #567d46 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="font-sans text-slate-800 leading-relaxed">
+
+    <!-- Hero Banner -->
+    <header class="relative overflow-hidden bg-ghibli-sky/20">
+        <div class="banner-container max-w-6xl mx-auto px-4 pt-4">
+            <div class="relative group">
+                <div class="absolute -inset-1 bg-gradient-to-r from-green-300 to-blue-300 rounded-[42px] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                <div class="relative">
+                    <img src='https://opal.google/board/blobs/889b5432-b8ab-404d-a73f-75c716232f01' alt='Acer 轉型主題與吉卜力畫風插畫' class="block" />
+                </div>
+            </div>
+        </div>
+        
+        <div class="max-w-4xl mx-auto px-6 pt-12 pb-20 text-center">
+            <div class="flex items-center justify-center gap-2 mb-4 animate-float">
+                <span class="px-3 py-1 bg-blue-100 text-blue-600 text-xs font-bold rounded-full tracking-widest uppercase">Business Evolution</span>
+                <span class="text-slate-400">•</span>
+                <span class="px-3 py-1 bg-orange-100 text-orange-600 text-xs font-bold rounded-full tracking-widest uppercase">M11409904</span>
+            </div>
+            <h1 class="font-display text-4xl md:text-6xl text-ghibli-deepBlue mb-6 leading-tight">
+                【企業變身大揭密】宏碁 Acer 的不死傳說：<br/>
+                <span class="text-ghibli-grass">從電腦製造商到「生活玩家」的進化之路</span>
+            </h1>
+            <p class="text-lg text-slate-600 max-w-2xl mx-auto font-light">
+                不只是你記憶中的老牌電腦公司，這是一場關於韌性、變革與重生的吉卜力式奇幻旅程。
+            </p>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-6 -mt-10 relative z-10">
+        
+        <!-- Intro Section -->
+        <section class="ghibli-card p-8 md:p-12 mb-12">
+            <div class="section-tag">一、前言</div>
+            <h2 class="text-2xl font-bold mb-6 text-ghibli-deepBlue">這不是你記憶中的「老牌電腦公司」！</h2>
+            <div class="space-y-4 text-slate-700">
+                <p>提到宏碁（Acer），你腦中浮現的第一個畫面是什麼？是竹科工程師身上那件萬年不敗的格子襯衫，還是學生時期陪你熬夜打報告、那台摔不壞也跑不快的耐操筆電？</p>
+                <p class="bg-blue-50 border-l-4 border-blue-400 p-4 italic">
+                    "如果你還停留在那裡，那你可能太小看這間自 1976 年成立的台灣老牌企業了。它簡直是商業界的「轉生大師」！"
+                </p>
+                <p>現在，這家「電腦公司」竟然賣起了能量飲、空氣清淨機、甚至連衣服都賣，還把底下的子公司一間間送上股票市場？本文將帶你拆解宏碁如何透過三次「神操作」的組織變革，從懸崖邊緣華麗轉身。</p>
+            </div>
+        </section>
+
+        <!-- Timeline Section (Bento Grid Style) -->
+        <section class="mb-16">
+            <div class="section-tag">二、歷史回顧</div>
+            <h2 class="text-3xl font-display text-ghibli-deepBlue mb-8">宏碁的三次「砍掉重練」大冒險</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <!-- Step 1 -->
+                <div class="md:col-span-7 ghibli-card p-8 border-l-8 border-ghibli-grass">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="w-10 h-10 rounded-full bg-ghibli-grass text-white flex items-center justify-center font-bold">1</span>
+                        <h3 class="text-xl font-bold text-ghibli-grass">1992年 —— 「微笑曲線」救火隊</h3>
+                    </div>
+                    <div class="space-y-3 text-sm">
+                        <p><strong>背景與痛點：</strong> 1990 年代初期，收購美國 Altos 公司水土不服，面臨嚴重結構性虧損。</p>
+                        <p><strong>神救援：</strong> 施振榮大哥拋出經典「微笑曲線」！指出高附加價值在於「研發」與「品牌行銷」。</p>
+                        <p class="font-medium text-ghibli-deepBlue">策略：全球品牌，在地結合 (Global Brand, Local Touch)。</p>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="md:col-span-5 ghibli-card p-8 border-l-8 border-ghibli-sky">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="w-10 h-10 rounded-full bg-ghibli-sky text-white flex items-center justify-center font-bold">2</span>
+                        <h3 class="text-xl font-bold text-ghibli-deepBlue">2000年 —— 大分手</h3>
+                    </div>
+                    <div class="space-y-3 text-sm">
+                        <p><strong>痛點：</strong> 品牌與代工「左右手互打」，客戶擔心技術外流。</p>
+                        <p><strong>解決：</strong> 痛定思痛搞「大分家」！宏碁(Acer)、緯創(Wistron)、明基(BenQ)三足鼎立。</p>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="md:col-span-12 ghibli-card p-8 border-l-8 border-ghibli-accent bg-orange-50/30">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="w-10 h-10 rounded-full bg-ghibli-accent text-white flex items-center justify-center font-bold">3</span>
+                        <h3 class="text-xl font-bold text-ghibli-accent">2013年後 —— 「小虎隊」成軍</h3>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div class="space-y-3 text-sm">
+                            <p><strong>背景：</strong> 行動網路重擊，傳統 PC 市場寒冬。</p>
+                            <p><strong>神救援：</strong> 施振榮復出，陳俊聖接棒。開發「硬體＋軟體＋服務」商務模式。</p>
+                        </div>
+                        <div class="bg-white/60 p-4 rounded-xl border border-orange-100">
+                            <p class="font-bold text-ghibli-deepBlue mb-2">多重引擎策略：</p>
+                            <p class="text-xs">將成熟業務拆分為獨立子公司上市（IPO）。如宏碁資訊、安碁資訊等，形成強大的控股軍團。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Expert Insight -->
+        <section class="ghibli-card p-8 md:p-12 mb-12 bg-ghibli-deepBlue text-white overflow-hidden relative">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 animate-sway"></div>
+            <div class="relative z-10">
+                <div class="section-tag bg-white text-ghibli-deepBlue">三、專家觀察</div>
+                <h2 class="text-2xl font-bold mb-6">宏碁現在的「體質」好嗎？</h2>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div class="border-l-2 border-ghibli-sky pl-6">
+                        <h4 class="font-bold text-ghibli-sky mb-2">核心獲利模式轉型</h4>
+                        <p class="text-slate-300 text-sm">打破單純賣硬體的維度，成功轉型為系統服務與多元產品企業，獲利能力更加穩健。</p>
+                    </div>
+                    <div class="border-l-2 border-ghibli-grass pl-6">
+                        <h4 class="font-bold text-ghibli-grass mb-2">「小虎隊」分散風險</h4>
+                        <p class="text-slate-300 text-sm">雞蛋不放在同一個籃子裡。當 PC 產業低迷時，資安、雲端子公司提供強勁動能。</p>
+                    </div>
+                </div>
+                <p class="mt-8 text-center text-ghibli-sky font-display text-xl">
+                    「宏碁已從一家電腦公司，轉變為一個高度靈活的變色龍企業。」
+                </p>
+            </div>
+        </section>
+
+        <!-- Spicy Discussion -->
+        <section class="mb-16">
+            <div class="section-tag">四、辛辣討論區</div>
+            <h2 class="text-2xl font-bold mb-8 text-ghibli-deepBlue">這些轉型真的沒問題嗎？</h2>
+            
+            <div class="space-y-6">
+                <div class="flex gap-4 items-start group">
+                    <div class="w-12 h-12 flex-shrink-0 bg-red-100 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                        🔥
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-800">文化衝突的後遺症</h4>
+                        <p class="text-slate-600 text-sm">接班制度的穩定性與企業文化的融合，始終是宏碁這類老牌公司最敏感的神經。</p>
+                    </div>
+                </div>
+                <div class="flex gap-4 items-start group">
+                    <div class="w-12 h-12 flex-shrink-0 bg-red-100 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                        🔥
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-800">「高 CP 值」的緊箍咒</h4>
+                        <p class="text-slate-600 text-sm">當它試圖進入 ConceptD 或頂級電競等高端市場時，品牌溢價能否說服挑剔的高階玩家？</p>
+                    </div>
+                </div>
+                <div class="flex gap-4 items-start group">
+                    <div class="w-12 h-12 flex-shrink-0 bg-red-100 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                        🔥
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-800">「不務正業」還是「超前部署」？</h4>
+                        <p class="text-slate-600 text-sm">能量飲、空氣清淨機。究竟是削弱關鍵技術專注力，還是成功轉化為生活風格品牌？</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Predictions -->
+        <section class="ghibli-card p-8 md:p-12 mb-16 border-dashed border-2 border-ghibli-grass bg-green-50/20">
+            <div class="section-tag bg-ghibli-grass">五、未來大預測</div>
+            <h2 class="text-3xl font-display text-ghibli-grass mb-8">宏碁還能進化成什麼樣子？</h2>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center p-4">
+                    <div class="text-3xl mb-2">🤖</div>
+                    <h5 class="font-bold text-xs mb-1">AI PC 領航</h5>
+                    <p class="text-[10px] text-slate-500">整合 NPU 技術，重新定義筆電。</p>
+                </div>
+                <div class="text-center p-4">
+                    <div class="text-3xl mb-2">🏠</div>
+                    <h5 class="font-bold text-xs mb-1">生活風格化</h5>
+                    <p class="text-[10px] text-slate-500">透過 Acerpure 深入家居角落。</p>
+                </div>
+                <div class="text-center p-4">
+                    <div class="text-3xl mb-2">📈</div>
+                    <h5 class="font-bold text-xs mb-1">控股平台化</h5>
+                    <p class="text-[10px] text-slate-500">持續孵化實力雄厚的子公司。</p>
+                </div>
+                <div class="text-center p-4">
+                    <div class="text-3xl mb-2">🌿</div>
+                    <h5 class="font-bold text-xs mb-1">綠色時尚</h5>
+                    <p class="text-[10px] text-slate-500">Vero 環保系列面對 Z 世代。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Conclusion -->
+        <section class="mb-20 text-center">
+            <div class="w-24 h-1 bg-ghibli-accent mx-auto mb-8"></div>
+            <h2 class="text-2xl font-bold mb-4 text-ghibli-deepBlue">六、結語：宏碁的變革給我們什麼啟示？</h2>
+            <p class="text-slate-600 max-w-2xl mx-auto mb-8 italic">
+                「唯有不斷變革，才是企業不變的真理。」下次當你看到宏碁的產品時，別再只想到那台耐操的老筆電。說不定你手裡正握著它出的能量飲呢！
+            </p>
+            
+            <!-- Interactive Area -->
+            <div class="ghibli-card p-8 bg-gradient-to-br from-ghibli-sky/10 to-ghibli-grass/10">
+                <h4 class="font-bold text-lg mb-4">💬 互動點：</h4>
+                <p class="mb-6">你最看好宏碁哪一個「小虎隊」子公司的潛力？</p>
+                <div class="flex flex-wrap justify-center gap-3">
+                    <button class="px-6 py-2 rounded-full border-2 border-ghibli-deepBlue text-ghibli-deepBlue hover:bg-ghibli-deepBlue hover:text-white transition-all font-bold text-sm">電競 Predator</button>
+                    <button class="px-6 py-2 rounded-full border-2 border-ghibli-deepBlue text-ghibli-deepBlue hover:bg-ghibli-deepBlue hover:text-white transition-all font-bold text-sm">資安 安碁</button>
+                    <button class="px-6 py-2 rounded-full border-2 border-ghibli-deepBlue text-ghibli-deepBlue hover:bg-ghibli-deepBlue hover:text-white transition-all font-bold text-sm">生活 Acerpure</button>
+                    <button class="px-6 py-2 rounded-full border-2 border-ghibli-deepBlue text-ghibli-deepBlue hover:bg-ghibli-deepBlue hover:text-white transition-all font-bold text-sm">AI 軟體</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Floating Decoration Elements -->
+    <div class="fixed top-20 left-10 w-24 h-24 bg-ghibli-sky opacity-10 rounded-full blur-3xl pointer-events-none animate-float"></div>
+    <div class="fixed bottom-20 right-10 w-32 h-32 bg-ghibli-grass opacity-10 rounded-full blur-3xl pointer-events-none animate-float" style="animation-delay: 2s"></div>
+
+    <script>
+        // Simple interaction for buttons
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                alert('感謝您的分享！這確實是宏碁轉型中非常精彩的一環。');
+            });
+        });
+
+        // Scroll Reveal Animation (Simple)
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-10');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('section').forEach(section => {
+            section.classList.add('transition-all', 'duration-700', 'opacity-0', 'translate-y-10');
+            observer.observe(section);
+        });
+    </script>
+</body>
+</html>
+
