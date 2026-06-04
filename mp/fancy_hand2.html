@@ -1,1166 +1,736 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gesture Music Controller - Final</title>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
-    <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
-
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: #0a0f19;
-        overflow: hidden;
-        font-family: "Courier New", monospace;
-      }
-
-      #overlay {
-        position: fixed;
-        inset: 0;
-        background: #0a0f19;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        color: #0ff;
-        z-index: 999;
-      }
-
-      .start-btn {
-        margin-top: 18px;
-        padding: 12px 28px;
-        border: 1px solid #0ff;
-        background: transparent;
-        color: #0ff;
-        cursor: pointer;
-        letter-spacing: 4px;
-        font-size: 1.05rem;
-      }
-
-      #status-log {
-        position: fixed;
-        left: 12px;
-        bottom: 10px;
-        color: rgba(0,255,255,0.55);
-        font-size: 11px;
-        z-index: 1000;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div id="overlay">
-      <div style="letter-spacing:8px; font-size:1.5rem;">GESTURE MUSIC CONTROLLER</div>
-      <div id="loading-msg" style="margin-top:10px; font-size:12px; color:rgba(0,255,255,0.65);">
-        LOADING AI ENGINE...
-      </div>
-      <button id="init-btn" class="start-btn" style="display:none;" onclick="initSystem()">
-        ACTIVATE_LINK
-      </button>
-    </div>
-
-    <div id="status-log">SYSTEM IDLE</div>
-
-    <script>
-      // =========================
-      // 基本系統
-      // =========================
-      let video, handPose, hands = [];
-      let isReady = false;
-      let modelCheckTimer = 0;
-
-      let uiOsc, uiEnv;
-      let mainColor;
-      let colors = ['#00ffff', '#ff00ff', '#ffff00'];
-      let colorIdx = 0;
-
-      // =========================
-      // 圖片
-      // =========================
-      const DEFAULT_AVATAR_FILE = 'totoro_cutout.png';
-      let fallbackImg = null;
-      let fallbackReady = false;
-
-      const trackArtFiles = {
-        '1': 'cover_1_mozart.png',
-        '2': 'cover_2_furelise.png',
-        '3': 'cover_3_totoro.png',
-        '4': 'cover_4_spring.png',
-        '5': 'cover_5_canon.png',
-        '6': 'cover_6_roar.png'
-      };
-
-      let trackImages = {};
-      let artFlashTimer = 0;
-
-      // =========================
-      // 音樂
-      // =========================
-      let roarSound = null;
-      let roarLoaded = false;
-
-      let activeOscillators = [];
-      let songTimers = [];
-
-      let selectedTrackKey = '1';
-      let playingTrackKey = null;
-      let playerState = 'stopped'; // stopped / playing / paused
-      let currentSongTitle = 'No music playing';
-      let currentSongColor = [0, 255, 255];
-
-      let trackStartMs = 0;
-      let pauseElapsedMs = 0;
-      let audioPauseTime = 0;
-
-      // =========================
-      // 手勢狀態
-      // =========================
-      let handCounts = [];
-      let detectedFingerCount = 0;
-
-      let selectionCandidate = '';
-      let selectionStableFrames = 0;
-      let lastSelectionTriggerFrame = -999;
-
-      let controlCandidate = '';
-      let controlStableFrames = 0;
-      let lastControlTriggerFrame = -999;
-
-      const SELECTION_STABLE_FRAMES = 18;
-      const CONTROL_STABLE_FRAMES = 18;
-      const SELECTION_COOLDOWN_FRAMES = 55;
-      const CONTROL_COOLDOWN_FRAMES = 55;
-      const MAX_FINGER_COUNT = 6;
-
-      // =========================
-      // 音高
-      // =========================
-      const NOTES = {
-        C2: 65.41, Cs2: 69.30, D2: 73.42, Ds2: 77.78, E2: 82.41, F2: 87.31, Fs2: 92.50, G2: 98.00, Gs2: 103.83, A2: 110.00, As2: 116.54, B2: 123.47,
-        C3: 130.81, Cs3: 138.59, D3: 146.83, Ds3: 155.56, E3: 164.81, F3: 174.61, Fs3: 185.00, G3: 196.00, Gs3: 207.65, A3: 220.00, As3: 233.08, B3: 246.94,
-        C4: 261.63, Cs4: 277.18, D4: 293.66, Ds4: 311.13, E4: 329.63, F4: 349.23, Fs4: 369.99, G4: 392.00, Gs4: 415.30, A4: 440.00, As4: 466.16, B4: 493.88,
-        C5: 523.25, Cs5: 554.37, D5: 587.33, Ds5: 622.25, E5: 659.25, F5: 698.46, Fs5: 739.99, G5: 783.99, Gs5: 830.61, A5: 880.00, As5: 932.33, B5: 987.77,
-        C6: 1046.50, Cs6: 1108.73, D6: 1174.66, Ds6: 1244.51, E6: 1318.51, F6: 1396.91, Fs6: 1479.98, G6: 1567.98, A6: 1760.00
-      };
-
-      function N(n, d) { return { n, d }; }
-      function C(chord, d) { return { chord, d }; }
-
-      function cloneSeq(seq) {
-        return seq.map(step => ({
-          ...step,
-          chord: step.chord ? [...step.chord] : undefined
-        }));
-      }
-
-      function rep(seq, times) {
-        let out = [];
-        for (let i = 0; i < times; i++) out = out.concat(cloneSeq(seq));
-        return out;
-      }
-
-      function seq(...items) {
-        return items;
-      }
-
-      // =========================
-      // 曲目資料
-      // =========================
-      const tracks = buildTracks();
-
-      function buildTracks() {
-        // 1 Mozart - 加長版
-        const mozA = seq(
-          N('G4',220), N('D4',220), N('G4',220), N('B4',220),
-          N('D5',440), N('B4',220), N('G4',440),
-          N('D5',220), N('B4',220), N('D5',220), N('G5',220),
-          N('Fs5',300), N('E5',140), N('D5',440)
-        );
-        const mozB = seq(
-          N('E5',220), N('C5',220), N('E5',220), N('G5',220),
-          N('Fs5',300), N('E5',140), N('D5',440),
-          N('B4',220), N('G4',220), N('A4',220), N('Fs4',220), N('G4',660)
-        );
-        const mozC = seq(
-          N('B4',220), N('D5',220), N('G5',220), N('B5',220),
-          N('A5',220), N('G5',220), N('Fs5',220), N('E5',220),
-          N('D5',220), N('C5',220), N('B4',220), N('A4',220), N('G4',700)
-        );
-        const mozMelody = rep(mozA, 2).concat(rep(mozB, 2)).concat(rep(mozC, 2)).concat(rep(mozA, 1)).concat(rep(mozB, 1));
-        const mozBassA = seq(
-          N('G3',440), N('D3',440), N('G3',440), N('D3',440),
-          N('C3',440), N('D3',440), N('G2',880)
-        );
-        const mozBass = rep(mozBassA, 6);
-
-        // 2 Beethoven / Fur Elise - 加長版
-        const furA = seq(
-          N('E5',160), N('Ds5',160), N('E5',160), N('Ds5',160),
-          N('E5',160), N('B4',160), N('D5',160), N('C5',160), N('A4',420),
-          N('C4',160), N('E4',160), N('A4',160), N('B4',420)
-        );
-        const furB = seq(
-          N('E4',160), N('Gs4',160), N('B4',160), N('C5',420),
-          N('E4',160), N('E5',160), N('Ds5',160), N('E5',160),
-          N('Ds5',160), N('E5',160), N('B4',160), N('D5',160), N('C5',160), N('A4',520)
-        );
-        const furC = seq(
-          N('A4',180), N('B4',180), N('C5',180), N('E5',180),
-          N('A5',360), N('G5',180), N('E5',180), N('C5',180),
-          N('G4',180), N('E4',360), N('A4',180), N('C5',180), N('E5',540)
-        );
-        const furMelody = rep(furA, 2).concat(rep(furB, 2)).concat(rep(furC, 2)).concat(rep(furA, 1)).concat(rep(furB, 1));
-        const furBassA = seq(
-          N('A2',640), N('E3',640), N('A2',640), N('E3',640), N('A2',880)
-        );
-        const furBass = rep(furBassA, 7);
-
-        // 3 龍貓主題曲 - 加長版
-        const totoA = seq(
-          N('G4',220), N('B4',220), N('D5',220), N('G5',380),
-          N('Fs5',180), N('E5',180), N('D5',220), N('B4',220),
-          N('A4',220), N('B4',220), N('D5',440)
-        );
-        const totoB = seq(
-          N('G4',220), N('A4',220), N('B4',220), N('D5',220),
-          N('E5',380), N('D5',180), N('B4',180), N('A4',220),
-          N('G4',220), N('B4',220), N('D5',440)
-        );
-        const totoC = seq(
-          N('D5',180), N('E5',180), N('G5',220), N('A5',220),
-          N('G5',220), N('E5',220), N('D5',220), N('B4',220),
-          N('A4',220), N('G4',220), N('D5',660)
-        );
-        const totoD = seq(
-          N('G4',220), N('B4',220), N('D5',220), N('G5',220),
-          N('A5',220), N('G5',220), N('Fs5',220), N('E5',220),
-          N('D5',220), N('B4',220), N('A4',220), N('G4',700)
-        );
-        const totoMelody = rep(totoA, 2).concat(rep(totoB, 2)).concat(rep(totoC, 2)).concat(rep(totoD, 2));
-        const totoBassA = seq(
-          N('G3',440), N('D3',440), N('E3',440), N('B2',440),
-          N('C3',440), N('D3',440), N('G2',880)
-        );
-        const totoBass = rep(totoBassA, 6);
-
-        // 4 Vivaldi / Spring - 加長版
-        const springA = seq(
-          N('E5',180), N('E5',180), N('E5',180), N('D5',180),
-          N('C5',360), N('C5',180), N('D5',180), N('E5',360)
-        );
-        const springB = seq(
-          N('G5',180), N('G5',180), N('G5',180), N('F5',180),
-          N('E5',360), N('D5',180), N('C5',180), N('B4',360)
-        );
-        const springC = seq(
-          N('C5',180), N('E5',180), N('G5',180), N('C6',180),
-          N('B5',180), N('A5',180), N('G5',360),
-          N('E5',180), N('D5',180), N('C5',600)
-        );
-        const springD = seq(
-          N('E5',180), N('G5',180), N('B5',180), N('A5',180),
-          N('G5',180), N('F5',180), N('E5',180), N('D5',180),
-          N('C5',220), N('D5',220), N('E5',600)
-        );
-        const springMelody = rep(springA, 2).concat(rep(springB, 2)).concat(rep(springC, 2)).concat(rep(springD, 2)).concat(rep(springA, 1));
-        const springBassA = seq(
-          N('C3',720), N('G2',720), N('C3',720), N('G2',720), N('C3',720)
-        );
-        const springBass = rep(springBassA, 6);
-
-        // 5 Canon in D
-        const canonA = seq(
-          C(['D4','Fs4','A4'], 520), C(['A3','Cs4','E4'], 520),
-          C(['B3','D4','Fs4'], 520), C(['Fs3','A3','Cs4'], 520),
-          C(['G3','B3','D4'], 520), C(['D3','Fs3','A3'], 520),
-          C(['G3','B3','D4'], 520), C(['A3','Cs4','E4'], 520)
-        );
-        const canonB = seq(
-          N('Fs4',180), N('E4',180), N('D4',180), N('Cs4',180),
-          N('B3',180), N('A3',180), N('B3',180), N('Cs4',180), N('D4',700)
-        );
-        const canonMelody = rep(canonA, 3).concat(rep(canonB, 3));
-        const canonBass = rep(seq(
-          N('D2',520), N('A2',520), N('B2',520), N('Fs2',520),
-          N('G2',520), N('D2',520), N('G2',520), N('A2',520)
-        ), 3);
-
-        return {
-          '1': {
-            key: '1',
-            title: '1 - Mozart / Eine kleine Nachtmusik',
-            shortTitle: 'MOZART VIOLIN',
-            instrument: 'violin',
-            color: [255, 90, 140],
-            tempo: 1.0,
-            melody: mozMelody,
-            bass: mozBass
-          },
-          '2': {
-            key: '2',
-            title: '2 - Beethoven / Fur Elise',
-            shortTitle: 'BEETHOVEN PIANO',
-            instrument: 'piano',
-            color: [120, 220, 255],
-            tempo: 1.0,
-            melody: furMelody,
-            bass: furBass
-          },
-          '3': {
-            key: '3',
-            title: '3 - My Neighbor Totoro Theme',
-            shortTitle: 'TOTORO THEME',
-            instrument: 'musicbox',
-            color: [150, 255, 190],
-            tempo: 1.0,
-            melody: totoMelody,
-            bass: totoBass
-          },
-          '4': {
-            key: '4',
-            title: '4 - Vivaldi / Spring',
-            shortTitle: 'VIVALDI STRINGS',
-            instrument: 'strings',
-            color: [150, 255, 160],
-            tempo: 0.92,
-            melody: springMelody,
-            bass: springBass
-          },
-          '5': {
-            key: '5',
-            title: '5 - Pachelbel / Canon in D',
-            shortTitle: 'CANON ORCHESTRA',
-            instrument: 'pad',
-            color: [220, 160, 255],
-            tempo: 1.05,
-            melody: canonMelody,
-            bass: canonBass
-          },
-          '6': {
-            key: '6',
-            title: '6 - Katy Perry / Roar.mp3',
-            shortTitle: 'ROAR MP3',
-            instrument: 'mp3',
-            color: [255, 120, 80],
-            file: 'Katy Perry - Roar.mp3'
-          }
-        };
-      }
-
-      // =========================
-      // setup
-      // =========================
-      function setup() {
-        createCanvas(windowWidth, windowHeight);
-        mainColor = color(colors[colorIdx]);
-        angleMode(DEGREES);
-        textFont('Courier New');
-
-        uiOsc = new p5.Oscillator('sine');
-        uiEnv = new p5.Envelope();
-        uiEnv.setADSR(0.001, 0.05, 0.1, 0.1);
-        uiEnv.setRange(0.45, 0);
-
-        fallbackImg = loadImage(
-          DEFAULT_AVATAR_FILE,
-          () => {
-            fallbackReady = true;
-            updateLog('FALLBACK IMAGE READY');
-          },
-          () => {
-            fallbackReady = false;
-            updateLog('FALLBACK IMAGE NOT FOUND');
-          }
-        );
-
-        for (const key in trackArtFiles) {
-          trackImages[key] = null;
-          loadImage(
-            trackArtFiles[key],
-            img => { trackImages[key] = img; },
-            () => { trackImages[key] = null; }
-          );
-        }
-
-        handPose = ml5.handPose({ flipped: true, maxHands: 2 }, () => {
-          document.getElementById('loading-msg').style.display = 'none';
-          document.getElementById('init-btn').style.display = 'block';
-          updateLog('MODEL ENGINE READY');
-        });
-      }
-
-      function initSystem() {
-        userStartAudio();
-        playBootSound();
-        loadRoarSound();
-
-        video = createCapture(VIDEO, () => {
-          document.getElementById('overlay').style.display = 'none';
-          startDetection();
-        });
-        video.size(640, 480);
-        video.hide();
-      }
-
-      function startDetection() {
-        isReady = true;
-        updateLog('INITIALIZING DETECTOR...');
-
-        handPose.detectStart(video, results => {
-          hands = results;
-          modelCheckTimer = 0;
-        });
-      }
-
-      function updateLog(msg) {
-        document.getElementById('status-log').innerText = `LOG: ${msg}`;
-      }
-
-      function playUITone(freq) {
-        uiOsc.freq(freq);
-        uiOsc.start();
-        uiEnv.play(uiOsc);
-      }
-
-      function playBootSound() {
-        let f = 300;
-        let interval = setInterval(() => {
-          playUITone(f);
-          f += 220;
-          if (f > 1600) clearInterval(interval);
-        }, 50);
-      }
-
-      function loadRoarSound() {
-        roarSound = loadSound(
-          'Katy Perry - Roar.mp3',
-          () => {
-            roarLoaded = true;
-            updateLog('ROAR MP3 READY');
-          },
-          () => {
-            roarLoaded = false;
-            updateLog('ROAR MP3 NOT FOUND');
-          }
-        );
-      }
-
-      // =========================
-      // draw
-      // =========================
-      function draw() {
-        background(10, 15, 25);
-        if (!isReady) return;
-
-        modelCheckTimer++;
-        if (modelCheckTimer > 240) {
-          updateLog('DETECTOR CHECK...');
-          modelCheckTimer = 0;
-        }
-
-        push();
-        translate(width, 0);
-        scale(-1, 1);
-        tint(0, 220, 255, 28);
-        image(video, 0, 0, width, height);
-        noTint();
-        pop();
-
-        if (hands && hands.length > 0) {
-          handCounts = hands.map(h => countExtendedFingers(h));
-          detectedFingerCount = constrain(handCounts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
-
-          drawTrackArtwork();
-
-          for (let i = 0; i < hands.length; i++) {
-            drawHandSkeleton(hands[i]);
-            drawHandTips(hands[i]);
-          }
-
-          let control = detectControlGesture(hands, handCounts);
-          updateControlGesture(control);
-
-          if (!control) {
-            let selection = detectSelectionGesture(hands, handCounts);
-            updateSelectionGesture(selection);
-          } else {
-            updateSelectionGesture('');
-          }
-        } else {
-          detectedFingerCount = 0;
-          handCounts = [];
-          updateSelectionGesture('');
-          updateControlGesture('');
-          drawTrackArtwork();
-          drawScanLine();
-        }
-
-        if (artFlashTimer > 0) artFlashTimer--;
-
-        drawTitleHUD();
-        drawGuideHUD();
-        drawStatusHUD();
-      }
-
-      // =========================
-      // 圖片顯示
-      // =========================
-      function getCurrentArtwork() {
-        return trackImages[selectedTrackKey] || fallbackImg;
-      }
-
-      function drawTrackArtwork() {
-        let art = getCurrentArtwork();
-        let boxH = min(height * 0.56, height - 250, 620);
-        boxH = max(280, boxH);
-
-        let boxW = boxH * 0.9;
-        let x = width / 2 - boxW / 2;
-        let y = 72;
-
-        push();
-        noFill();
-        stroke(currentSongColor[0], currentSongColor[1], currentSongColor[2], 180);
-        strokeWeight(2);
-        rect(x - 10, y - 10, boxW + 20, boxH + 20, 12);
-
-        if (art) {
-          imageMode(CORNER);
-          tint(255, 248);
-          image(art, x, y, boxW, boxH);
-          noTint();
-        } else {
-          drawArtworkPlaceholder(x, y, boxW, boxH);
-        }
-
-        if (artFlashTimer > 0) {
-          noFill();
-          stroke(255, 255, 255, 180);
-          strokeWeight(4);
-          rect(x - 16, y - 16, boxW + 32, boxH + 32, 16);
-        }
-
-        fill(0, 0, 0, 110);
-        noStroke();
-        rect(x, y + boxH - 60, boxW, 60, 0, 0, 12, 12);
-
-        fill(255);
-        textAlign(CENTER, CENTER);
-        textSize(16);
-        text(tracks[selectedTrackKey].shortTitle, x + boxW / 2, y + boxH - 36);
-        textSize(10);
-        text(tracks[selectedTrackKey].title, x + boxW / 2, y + boxH - 18);
-        pop();
-      }
-
-      function drawArtworkPlaceholder(x, y, w, h) {
-        push();
-        fill(60, 70, 90);
-        noStroke();
-        rect(x, y, w, h, 12);
-
-        fill(255);
-        textAlign(CENTER, CENTER);
-        textSize(18);
-        text('NO ARTWORK', x + w / 2, y + h / 2 - 14);
-        textSize(11);
-        text('請放入對應封面圖片', x + w / 2, y + h / 2 + 12);
-        pop();
-      }
-
-      // =========================
-      // 手勢判斷
-      // =========================
-      function countExtendedFingers(hand) {
-        let kp = hand.keypoints;
-        let palm = kp[9];
-        let count = 0;
-
-        let thumbTip = kp[4];
-        let thumbIp = kp[3];
-        let thumbOpen = dist(thumbTip.x, thumbTip.y, palm.x, palm.y) > dist(thumbIp.x, thumbIp.y, palm.x, palm.y) + 18;
-        if (thumbOpen) count++;
-
-        if (kp[8].y  < kp[6].y  - 10) count++;
-        if (kp[12].y < kp[10].y - 10) count++;
-        if (kp[16].y < kp[14].y - 10) count++;
-        if (kp[20].y < kp[18].y - 10) count++;
-
-        return constrain(count, 0, 5);
-      }
-
-      function thumbAndIndexTouching(hand) {
-        let kp = hand.keypoints;
-        let thumbTip = kp[4];
-        let indexTip = kp[8];
-        let wrist = kp[0];
-        let palm = kp[9];
-        let handScale = dist(wrist.x, wrist.y, palm.x, palm.y);
-        let d = dist(thumbTip.x, thumbTip.y, indexTip.x, indexTip.y);
-        let threshold = max(22, handScale * 0.42);
-        return d < threshold;
-      }
-
-      function isFingerExtended(hand, tipIdx, pipIdx) {
-        let kp = hand.keypoints;
-        return kp[tipIdx].y < kp[pipIdx].y - 10;
-      }
-
-      function isOKPlayGesture(hand) {
-        if (!thumbAndIndexTouching(hand)) return false;
-        let middleOpen = isFingerExtended(hand, 12, 10);
-        let ringOpen = isFingerExtended(hand, 16, 14);
-        let pinkyOpen = isFingerExtended(hand, 20, 18);
-        return middleOpen && ringOpen && pinkyOpen;
-      }
-
-      function detectSelectionGesture(activeHands, counts) {
-        let total = constrain(counts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
-        if (total >= 1 && total <= MAX_FINGER_COUNT) return String(total);
-        return '';
-      }
-
-      function updateSelectionGesture(selection) {
-        if (selection === selectionCandidate) {
-          selectionStableFrames++;
-        } else {
-          selectionCandidate = selection;
-          selectionStableFrames = 0;
-        }
-
-        let stable = selectionStableFrames > SELECTION_STABLE_FRAMES;
-        let cooledDown = frameCount - lastSelectionTriggerFrame > SELECTION_COOLDOWN_FRAMES;
-
-        if (selection && stable && cooledDown && tracks[selection]) {
-          selectTrack(selection);
-          lastSelectionTriggerFrame = frameCount;
-        }
-      }
-
-      function selectTrack(key) {
-        selectedTrackKey = key;
-        currentSongColor = tracks[key].color;
-        artFlashTimer = 18;
-        updateLog(`SELECTED ${tracks[key].shortTitle}. USE OK TO PLAY.`);
-        playUITone(1100);
-      }
-
-      function detectControlGesture(activeHands, counts) {
-        if (activeHands.length >= 2 && counts[0] === 0 && counts[1] === 0) return 'STOP';
-
-        for (let i = 0; i < activeHands.length; i++) {
-          if (isOKPlayGesture(activeHands[i])) return 'PLAY';
-        }
-
-        if (activeHands.length === 1 && counts[0] === 0) return 'PAUSE';
-        return '';
-      }
-
-      function updateControlGesture(control) {
-        if (control === controlCandidate) {
-          controlStableFrames++;
-        } else {
-          controlCandidate = control;
-          controlStableFrames = 0;
-        }
-
-        let stable = controlStableFrames > CONTROL_STABLE_FRAMES;
-        let cooledDown = frameCount - lastControlTriggerFrame > CONTROL_COOLDOWN_FRAMES;
-
-        if (control && stable && cooledDown) {
-          if (control === 'PLAY') startOrResumeSelectedTrack();
-          if (control === 'PAUSE') pausePlayback();
-          if (control === 'STOP') stopPlayback(true);
-          lastControlTriggerFrame = frameCount;
-        }
-      }
-
-      // =========================
-      // 播放控制
-      // =========================
-      function startOrResumeSelectedTrack() {
-        if (!tracks[selectedTrackKey]) return;
-
-        if (playerState === 'paused' && playingTrackKey === selectedTrackKey) {
-          resumePlayback();
-          return;
-        }
-
-        playSelectedTrackFromStart();
-      }
-
-      function playSelectedTrackFromStart() {
-        stopPlayback(false);
-
-        const track = tracks[selectedTrackKey];
-        playingTrackKey = selectedTrackKey;
-        playerState = 'playing';
-        currentSongTitle = track.title;
-        currentSongColor = track.color;
-        pauseElapsedMs = 0;
-        audioPauseTime = 0;
-        trackStartMs = millis();
-
-        if (track.instrument === 'mp3') {
-          if (roarLoaded && roarSound) {
-            roarSound.stop();
-            roarSound.setVolume(0.9);
-            roarSound.play();
-            updateLog(`PLAYING ${track.shortTitle}`);
-            playUITone(1400);
-          } else {
-            updateLog('ROAR MP3 NOT READY OR FILE NOT FOUND');
-            playUITone(220);
-            playerState = 'stopped';
-            playingTrackKey = null;
-            currentSongTitle = 'No music playing';
-          }
-          return;
-        }
-
-        scheduleSynthTrack(track, 0);
-        updateLog(`PLAYING ${track.shortTitle}`);
-        playUITone(1400);
-      }
-
-      function pausePlayback() {
-        if (playerState !== 'playing') return;
-
-        const track = tracks[playingTrackKey];
-        pauseElapsedMs = millis() - trackStartMs;
-
-        clearSongTimers();
-        stopActiveOscillators();
-
-        if (track && track.instrument === 'mp3' && roarSound && roarSound.isPlaying()) {
-          audioPauseTime = roarSound.currentTime();
-          roarSound.pause();
-        }
-
-        playerState = 'paused';
-        updateLog('PLAYBACK PAUSED');
-        playUITone(500);
-      }
-
-      function resumePlayback() {
-        if (playerState !== 'paused' || !playingTrackKey) return;
-
-        const track = tracks[playingTrackKey];
-        playerState = 'playing';
-        trackStartMs = millis() - pauseElapsedMs;
-        currentSongTitle = track.title;
-        currentSongColor = track.color;
-
-        if (track.instrument === 'mp3') {
-          if (roarLoaded && roarSound) {
-            roarSound.play(0, 1, 0.9, audioPauseTime);
-            updateLog(`RESUMED ${track.shortTitle}`);
-            playUITone(1300);
-          }
-          return;
-        }
-
-        scheduleSynthTrack(track, pauseElapsedMs);
-        updateLog(`RESUMED ${track.shortTitle}`);
-        playUITone(1300);
-      }
-
-      function stopPlayback(showLog = true) {
-        clearSongTimers();
-        stopActiveOscillators();
-
-        if (roarSound && roarSound.isPlaying && roarSound.isPlaying()) {
-          roarSound.stop();
-        }
-
-        playerState = 'stopped';
-        playingTrackKey = null;
-        pauseElapsedMs = 0;
-        audioPauseTime = 0;
-        currentSongTitle = 'No music playing';
-
-        if (showLog) {
-          updateLog('PLAYBACK STOPPED');
-          playUITone(260);
-        }
-      }
-
-      function clearSongTimers() {
-        songTimers.forEach(t => clearTimeout(t));
-        songTimers = [];
-      }
-
-      function stopActiveOscillators() {
-        activeOscillators.forEach(o => {
-          try { o.stop(); } catch(e) {}
-        });
-        activeOscillators = [];
-      }
-
-      function scheduleSynthTrack(track, offsetMs) {
-        clearSongTimers();
-
-        const events = buildTrackEvents(track);
-        let lastTime = 0;
-
-        events.forEach(event => {
-          lastTime = max(lastTime, event.time + event.dur);
-          if (event.time + event.dur < offsetMs) return;
-
-          const delay = max(0, event.time - offsetMs);
-          const timer = setTimeout(() => {
-            if (playerState !== 'playing' || playingTrackKey !== track.key) return;
-
-            if (event.note) playInstrumentNote(event.freq, event.dur, event.instrument, event.volume);
-            if (event.chord) playChord(event.chord, event.dur, event.instrument, event.volume);
-          }, delay);
-
-          songTimers.push(timer);
-        });
-
-        const endTimer = setTimeout(() => {
-          if (playerState === 'playing' && playingTrackKey === track.key) {
-            playerState = 'stopped';
-            playingTrackKey = null;
-            currentSongTitle = 'No music playing';
-            updateLog(`${track.shortTitle} COMPLETE`);
-          }
-        }, max(0, lastTime - offsetMs + 800));
-
-        songTimers.push(endTimer);
-      }
-
-      function buildTrackEvents(track) {
-        let events = [];
-        appendSequenceEvents(events, track.melody || [], track.instrument, track.tempo || 1, 1.0, 0);
-        appendSequenceEvents(events, track.bass || [], 'bass', track.tempo || 1, 0.72, 0);
-        events.sort((a, b) => a.time - b.time);
-        return events;
-      }
-
-      function appendSequenceEvents(events, sequence, instrument, tempo, volume, startAt) {
-        let t = startAt;
-
-        sequence.forEach(step => {
-          const dur = step.d * tempo;
-
-          if (step.n && step.n !== 'R') {
-            events.push({
-              time: t,
-              dur,
-              instrument,
-              volume,
-              note: step.n,
-              freq: NOTES[step.n]
-            });
-          }
-
-          if (step.chord) {
-            events.push({
-              time: t,
-              dur,
-              instrument,
-              volume,
-              chord: step.chord
-            });
-          }
-
-          t += dur;
-        });
-      }
-
-      function trackOsc(o) {
-        activeOscillators.push(o);
-        return o;
-      }
-
-      function playChord(noteNames, dur, instrument, volumeScale = 1) {
-        noteNames.forEach((name, i) => {
-          const timer = setTimeout(() => {
-            playInstrumentNote(NOTES[name], dur, instrument, volumeScale * 0.75);
-          }, i * 24);
-          songTimers.push(timer);
-        });
-      }
-
-      function playInstrumentNote(freq, dur, instrument, volumeScale = 1) {
-        if (!freq) return;
-
-        if (instrument === 'piano') playPianoNote(freq, dur, volumeScale);
-        else if (instrument === 'violin') playViolinNote(freq, dur, volumeScale);
-        else if (instrument === 'harpsichord') playHarpsichordNote(freq, dur, volumeScale);
-        else if (instrument === 'strings') playStringNote(freq, dur, volumeScale);
-        else if (instrument === 'pad') playPadNote(freq, dur, volumeScale);
-        else if (instrument === 'musicbox') playMusicBoxNote(freq, dur, volumeScale);
-        else if (instrument === 'bass') playBassNote(freq, dur, volumeScale);
-      }
-
-      function playPianoNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.001, 0.07, 0.22, 0.22);
-        env.setRange(0.45 * volumeScale, 0);
-
-        let s1 = trackOsc(new p5.Oscillator('triangle'));
-        let s2 = trackOsc(new p5.Oscillator('sine'));
-        s1.freq(freq);
-        s2.freq(freq * 2.01);
-        s1.start();
-        s2.start();
-        s2.amp(0.10 * volumeScale);
-        env.play(s1);
-
-        setTimeout(() => {
-          try { s1.stop(); s2.stop(); } catch(e) {}
-        }, dur + 650);
-      }
-
-      function playViolinNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.12, 0.12, 0.38, 0.28);
-        env.setRange(0.28 * volumeScale, 0);
-
-        let s1 = trackOsc(new p5.Oscillator('sawtooth'));
-        let s2 = trackOsc(new p5.Oscillator('triangle'));
-        s1.freq(freq);
-        s2.freq(freq * 2.005);
-        s1.start();
-        s2.start();
-        s2.amp(0.055 * volumeScale);
-        env.play(s1);
-
-        setTimeout(() => {
-          try { s1.stop(); s2.stop(); } catch(e) {}
-        }, dur + 700);
-      }
-
-      function playHarpsichordNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.001, 0.05, 0.12, 0.12);
-        env.setRange(0.34 * volumeScale, 0);
-
-        let s = trackOsc(new p5.Oscillator('square'));
-        s.freq(freq);
-        s.start();
-        env.play(s);
-
-        setTimeout(() => {
-          try { s.stop(); } catch(e) {}
-        }, dur + 350);
-      }
-
-      function playStringNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.06, 0.12, 0.42, 0.35);
-        env.setRange(0.32 * volumeScale, 0);
-
-        let s1 = trackOsc(new p5.Oscillator('sawtooth'));
-        let s2 = trackOsc(new p5.Oscillator('sawtooth'));
-        s1.freq(freq);
-        s2.freq(freq * 1.005);
-        s1.start();
-        s2.start();
-        s2.amp(0.08 * volumeScale);
-        env.play(s1);
-
-        setTimeout(() => {
-          try { s1.stop(); s2.stop(); } catch(e) {}
-        }, dur + 650);
-      }
-
-      function playPadNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.22, 0.25, 0.28, 0.75);
-        env.setRange(0.25 * volumeScale, 0);
-
-        let s1 = trackOsc(new p5.Oscillator('sine'));
-        let s2 = trackOsc(new p5.Oscillator('triangle'));
-        s1.freq(freq);
-        s2.freq(freq * 1.5);
-        s1.start();
-        s2.start();
-        s2.amp(0.08 * volumeScale);
-        env.play(s1);
-
-        setTimeout(() => {
-          try { s1.stop(); s2.stop(); } catch(e) {}
-        }, dur + 1200);
-      }
-
-      function playMusicBoxNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.001, 0.04, 0.12, 0.25);
-        env.setRange(0.38 * volumeScale, 0);
-
-        let s1 = trackOsc(new p5.Oscillator('triangle'));
-        let s2 = trackOsc(new p5.Oscillator('sine'));
-        s1.freq(freq);
-        s2.freq(freq * 2.0);
-        s1.start();
-        s2.start();
-        s2.amp(0.06 * volumeScale);
-        env.play(s1);
-
-        setTimeout(() => {
-          try { s1.stop(); s2.stop(); } catch(e) {}
-        }, dur + 500);
-      }
-
-      function playBassNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.005, 0.06, 0.25, 0.16);
-        env.setRange(0.42 * volumeScale, 0);
-
-        let s = trackOsc(new p5.Oscillator('square'));
-        s.freq(freq);
-        s.start();
-        env.play(s);
-
-        setTimeout(() => {
-          try { s.stop(); } catch(e) {}
-        }, dur + 450);
-      }
-
-      // =========================
-      // 手部視覺
-      // =========================
-      function drawHandSkeleton(hand) {
-        let connections = [
-          [0,1],[1,2],[2,3],[3,4],
-          [0,5],[5,6],[6,7],[7,8],
-          [5,9],[9,10],[10,11],[11,12],
-          [9,13],[13,14],[14,15],[15,16],
-          [13,17],[17,18],[18,19],[19,20],
-          [0,17]
-        ];
-
-        stroke(0,255,255,115);
-        strokeWeight(2);
-
-        connections.forEach(pair => {
-          let a = hand.keypoints[pair[0]];
-          let b = hand.keypoints[pair[1]];
-          let ax = map(a.x, 0, 640, 0, width);
-          let ay = map(a.y, 0, 480, 0, height);
-          let bx = map(b.x, 0, 640, 0, width);
-          let by = map(b.y, 0, 480, 0, height);
-          line(ax, ay, bx, by);
-        });
-      }
-
-      function drawHandTips(hand) {
-        let tips = [4,8,12,16,20];
-        noFill();
-        stroke(255, 190);
-        strokeWeight(1.5);
-
-        tips.forEach(idx => {
-          let k = hand.keypoints[idx];
-          let x = map(k.x, 0, 640, 0, width);
-          let y = map(k.y, 0, 480, 0, height);
-          circle(x, y, 14);
-        });
-      }
-
-      // =========================
-      // HUD
-      // =========================
-      function drawTitleHUD() {
-        push();
-        fill(255);
-        textAlign(CENTER, CENTER);
-        textSize(18);
-        text('Gesture Music Controller', width / 2, 24);
-        pop();
-      }
-
-      function drawGuideHUD() {
-        let panelW = min(1120, width - 40);
-        let panelH = 142;
-        let x = width / 2 - panelW / 2;
-        let y = height - panelH - 18;
-
-        push();
-        noFill();
-        stroke(0,255,255,120);
-        rect(x, y, panelW, panelH, 8);
-        fill(0,255,255,24);
-        rect(x, y, panelW, panelH, 8);
-
-        fill(255);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(10);
-
-        text('選曲：數字 1~5 = 內建樂曲｜數字 6 = Roar.mp3', x + panelW/2, y + 18);
-        text('播放控制：OK 手勢 = 播放 / 繼續｜單手握拳 = 暫停｜雙手握拳 = 停止', x + panelW/2, y + 38);
-        text('切換歌曲時，中央圖片會切換成該曲目的封面圖片', x + panelW/2, y + 58);
-
-        const keys = ['1','2','3','4','5','6'];
-        const cellW = panelW / keys.length;
-
-        keys.forEach((key, i) => {
-          const tr = tracks[key];
-          const c = tr.color;
-          const selected = selectedTrackKey === key;
-
-          stroke(c[0], c[1], c[2], selected ? 255 : 130);
-          fill(selected ? color(c[0], c[1], c[2], 60) : color(0,0,0,0));
-          rect(x + i * cellW + 6, y + 76, cellW - 12, 50, 4);
-
-          fill(c[0], c[1], c[2], 255);
-          noStroke();
-          textSize(16);
-          text(key, x + i * cellW + cellW / 2, y + 92);
-
-          fill(255);
-          textSize(8);
-          text(tr.shortTitle, x + i * cellW + cellW / 2, y + 111);
-        });
-
-        pop();
-      }
-
-      function drawStatusHUD() {
-        let c = currentSongColor;
-
-        push();
-        translate(width - 340, 46);
-        noFill();
-        stroke(c[0], c[1], c[2], 180);
-        rect(0, 0, 300, 140, 4);
-
-        fill(c[0], c[1], c[2], 48);
-        rect(0, 0, 300, 140, 4);
-
-        fill(255);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(10);
-        text('SYSTEM STATUS', 150, 16);
-
-        textSize(9);
-        text(`SELECTED : ${tracks[selectedTrackKey].shortTitle}`, 150, 38);
-        text(`STATE    : ${playerState.toUpperCase()}`, 150, 58);
-        text(`NOW      : ${currentSongTitle}`, 150, 78);
-        text(`COUNT    : ${detectedFingerCount}`, 150, 98);
-        text(`CONTROL  : ${controlCandidate || '-'}`, 150, 116);
-        text(`IMAGE    : ${trackArtFiles[selectedTrackKey]}`, 150, 132);
-        pop();
-      }
-
-      function drawScanLine() {
-        stroke(0,255,255,70);
-        let sy = (frameCount * 4) % height;
-        line(0, sy, width, sy);
-      }
-
-      function windowResized() {
-        resizeCanvas(windowWidth, windowHeight);
-      }
-    </script>
-  </body>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gesture Music Player - Stable Lite MP3 Update</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #08111f;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      color: white;
+    }
+    #overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #08111f;
+      z-index: 99;
+      color: #7ff;
+    }
+    button {
+      margin-top: 18px;
+      padding: 12px 22px;
+      border: 1px solid #7ff;
+      background: transparent;
+      color: #7ff;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    #log {
+      position: fixed;
+      left: 12px;
+      bottom: 10px;
+      color: rgba(255,255,255,0.75);
+      font-size: 14px;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay">
+    <div style="font-size: 28px; letter-spacing: 2px;">Gesture Music Player</div>
+    <div id="loading" style="margin-top:10px; font-size:14px;">Loading AI model...</div>
+    <button id="startBtn" onclick="initSystem()" style="display:none;">開始</button>
+  </div>
+  <div id="log">SYSTEM IDLE</div>
+
+<script>
+let video, handPose, hands = [];
+let ready = false;
+
+let uiOsc, uiEnv;
+let roarSound = null;
+let roarLoaded = false;
+let waltzSound = null;
+let waltzLoaded = false;
+let interludeSound = null;
+let interludeLoaded = false;
+let totoroThemeSound = null;
+let totoroThemeLoaded = false;
+let activeOscillators = [];
+let timers = [];
+
+let fallbackImg = null;
+let artworks = {};
+
+let selectedTrackKey = '1';
+let playingTrackKey = null;
+let playerState = 'stopped';
+let currentSongTitle = 'No music playing';
+let currentTrackDurationMs = 1;
+let trackStartMs = 0;
+let pauseElapsedMs = 0;
+let audioPauseTime = 0;
+let currentSongColor = [0, 255, 255];
+
+let selectionCandidate = '';
+let selectionStableFrames = 0;
+let lastSelectionTriggerFrame = -999;
+let controlCandidate = '';
+let controlStableFrames = 0;
+let lastControlTriggerFrame = -999;
+let detectedCount = 0;
+
+const SELECTION_STABLE_FRAMES = 14;
+const CONTROL_STABLE_FRAMES = 14;
+const SELECTION_COOLDOWN_FRAMES = 40;
+const CONTROL_COOLDOWN_FRAMES = 40;
+
+const NOTES = {
+  C2: 65.41, D2: 73.42, E2: 82.41, F2: 87.31, G2: 98.00, A2: 110.00, B2: 123.47,
+  C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, B3: 246.94,
+  C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88,
+  C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00, B5: 987.77,
+  C6: 1046.50
+};
+
+function N(n, d) { return { n, d }; }
+function C(chord, d) { return { chord, d }; }
+function seq(...items) { return items; }
+function cloneSeq(s) { return s.map(step => ({...step, chord: step.chord ? [...step.chord] : undefined})); }
+function rep(s, times) { let out = []; for (let i = 0; i < times; i++) out = out.concat(cloneSeq(s)); return out; }
+
+const trackArtFiles = {
+  '1': 'cover_1_mozart.png',
+  '2': 'cover_2_furelise.png',
+  '3': 'cover_3_totoro.png',
+  '4': 'cover_4_spring.png',
+  '5': 'cover_5_canon.png',
+  '6': 'cover_6_roar.png'
+};
+
+const tracks = buildTracks();
+
+function buildTracks() {
+  const mozMelody = rep(seq(N('G4',220), N('D4',220), N('G4',220), N('B4',220), N('D5',440), N('B4',220), N('G4',440), N('E5',220), N('C5',220), N('E5',220), N('G5',220), N('D5',660)), 4);
+  const mozBass = rep(seq(N('G3',440), N('D3',440), N('C3',440), N('D3',440), N('G2',880)), 5);
+
+  const furMelody = rep(seq(N('E5',160), N('D5',160), N('E5',160), N('D5',160), N('E5',160), N('B4',160), N('D5',160), N('C5',160), N('A4',420), N('C4',160), N('E4',160), N('A4',160), N('B4',420)), 4);
+  const furBass = rep(seq(N('A2',640), N('E3',640), N('A2',880)), 6);
+
+  const totoMelody = rep(seq(N('G4',220), N('B4',220), N('D5',220), N('G5',380), N('E5',180), N('D5',220), N('B4',220), N('A4',220), N('B4',220), N('D5',440)), 5);
+  const totoBass = rep(seq(N('G3',440), N('D3',440), N('C3',440), N('D3',440), N('G2',880)), 5);
+
+  return {
+    '1': {
+      key: '1', title: '1 - Mozart / Eine kleine Nachtmusik', shortTitle: 'MOZART', instrument: 'violin', color: [255, 90, 140], tempo: 1.0, melody: mozMelody, bass: mozBass
+    },
+    '2': {
+      key: '2', title: '2 - Beethoven / Fur Elise', shortTitle: 'FUR ELISE', instrument: 'piano', color: [120, 220, 255], tempo: 1.0, melody: furMelody, bass: furBass
+    },
+    '3': {
+      key: '3', title: '3 - My Neighbor Totoro Theme.mp3', shortTitle: 'TOTORO MP3', instrument: 'mp3_totoro', color: [150, 255, 190], file: 'My Neighbor Totoro Theme.mp3'
+    },
+    '4': {
+      key: '4', title: '4 - Waltz in A-flat major.mp3', shortTitle: 'WALTZ MP3', instrument: 'mp3_waltz', color: [150, 255, 160], file: 'Waltz in A-flat major.mp3'
+    },
+    '5': {
+      key: '5', title: "5 - Interlude Lonesome George's Dream.mp3", shortTitle: 'INTERLUDE MP3', instrument: 'mp3_interlude', color: [220, 160, 255], file: "Interlude Lonesome George's Dream.mp3"
+    },
+    '6': {
+      key: '6', title: '6 - Katy Perry / Roar.mp3', shortTitle: 'ROAR MP3', instrument: 'mp3_roar', color: [255, 120, 80], file: 'Katy Perry - Roar.mp3'
+    }
+  };
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  angleMode(DEGREES);
+  uiOsc = new p5.Oscillator('sine');
+  uiEnv = new p5.Envelope();
+  uiEnv.setADSR(0.001, 0.05, 0.1, 0.1);
+  uiEnv.setRange(0.4, 0);
+
+  fallbackImg = loadImage('totoro_cutout.png', ()=>{}, ()=>{});
+  for (const key in trackArtFiles) {
+    artworks[key] = null;
+    loadImage(trackArtFiles[key], img => artworks[key] = img, () => artworks[key] = null);
+  }
+
+  handPose = ml5.handPose({ flipped: true, maxHands: 2 }, () => {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('startBtn').style.display = 'block';
+    setLog('MODEL READY');
+  });
+}
+
+function initSystem() {
+  userStartAudio();
+  loadAllMp3();
+  playUITone(880);
+  video = createCapture(VIDEO, () => {
+    document.getElementById('overlay').style.display = 'none';
+    handPose.detectStart(video, results => { hands = results; });
+    ready = true;
+  });
+  video.size(640, 480);
+  video.hide();
+}
+
+function setLog(msg) {
+  document.getElementById('log').innerText = msg;
+}
+
+function loadAllMp3() {
+  roarSound = loadSound('Katy Perry - Roar.mp3', () => {
+    roarLoaded = true;
+    setLog('ROAR READY');
+  }, () => {
+    roarLoaded = false;
+    setLog('ROAR MP3 NOT FOUND');
+  });
+
+  waltzSound = loadSound('Waltz in A-flat major.mp3', () => {
+    waltzLoaded = true;
+    setLog('WALTZ READY');
+  }, () => {
+    waltzLoaded = false;
+    setLog('WALTZ MP3 NOT FOUND');
+  });
+
+  interludeSound = loadSound("Interlude Lonesome George's Dream.mp3", () => {
+    interludeLoaded = true;
+    setLog('INTERLUDE READY');
+  }, () => {
+    interludeLoaded = false;
+    setLog('INTERLUDE MP3 NOT FOUND');
+  });
+
+  totoroThemeSound = loadSound('My Neighbor Totoro Theme.mp3', () => {
+    totoroThemeLoaded = true;
+    setLog('TOTORO THEME READY');
+  }, () => {
+    totoroThemeLoaded = false;
+    setLog('TOTORO THEME MP3 NOT FOUND');
+  });
+}
+
+function playUITone(freq) {
+  uiOsc.freq(freq);
+  uiOsc.start();
+  uiEnv.play(uiOsc);
+}
+
+function draw() {
+  background(8, 17, 31);
+  if (!ready) return;
+
+  if (video) {
+    push();
+    translate(width, 0);
+    scale(-1, 1);
+    tint(80, 140, 255, 22);
+    image(video, 0, 0, width, height);
+    noTint();
+    pop();
+  }
+
+  drawPlayerCard();
+
+  if (hands && hands.length > 0) {
+    detectedCount = hands.map(countExtendedFingers).reduce((a,b) => a + b, 0);
+    hands.forEach(drawHandSimple);
+
+    const control = detectControlGesture(hands);
+    updateControlGesture(control);
+
+    if (!control) {
+      const selection = detectSelectionGesture(hands);
+      updateSelectionGesture(selection);
+    } else {
+      updateSelectionGesture('');
+    }
+  } else {
+    updateSelectionGesture('');
+    updateControlGesture('');
+  }
+
+  drawTopText();
+  drawBottomGuide();
+}
+
+function drawPlayerCard() {
+  const track = tracks[selectedTrackKey];
+  const art = artworks[selectedTrackKey] || fallbackImg;
+  const c = currentSongColor;
+  const cardW = min(520, width * 0.42);
+  const cardH = min(690, height * 0.74);
+  const x = width / 2 - cardW / 2;
+  const y = 60;
+  const artSize = min(cardW - 64, cardH * 0.55);
+  const artX = x + cardW / 2 - artSize / 2;
+  const artY = y + 36;
+
+  noStroke();
+  fill(0,0,0,120);
+  rect(x + 12, y + 14, cardW, cardH, 24);
+
+  stroke(c[0], c[1], c[2], 180);
+  strokeWeight(2);
+  fill(11, 22, 40, 228);
+  rect(x, y, cardW, cardH, 24);
+
+  fill(0,0,0,110);
+  noStroke();
+  rect(artX + 8, artY + 10, artSize, artSize, 22);
+
+  stroke(c[0], c[1], c[2], 200);
+  fill(18, 28, 45);
+  rect(artX, artY, artSize, artSize, 22);
+
+  if (art) image(art, artX + 8, artY + 8, artSize - 16, artSize - 16);
+
+  fill(c[0], c[1], c[2]);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(24);
+  text(track.shortTitle, x + cardW / 2, artY + artSize + 56);
+  fill(220);
+  textSize(12);
+  text(track.title, x + cardW / 2, artY + artSize + 82);
+
+  const barX = x + 42;
+  const barY = artY + artSize + 132;
+  const barW = cardW - 84;
+  const progress = getProgressRatio();
+
+  fill(255,255,255,38);
+  noStroke();
+  rect(barX, barY, barW, 10, 8);
+  fill(c[0], c[1], c[2], 220);
+  rect(barX, barY, barW * progress, 10, 8);
+
+  fill(255, 180);
+  textAlign(LEFT, CENTER);
+  textSize(10);
+  const elapsed = playerState === 'paused' ? pauseElapsedMs : max(0, millis() - trackStartMs);
+  text(formatTime(elapsed), barX, barY + 24);
+  textAlign(RIGHT, CENTER);
+  text(formatTime(currentTrackDurationMs), barX + barW, barY + 24);
+
+  drawStateBadge(x + cardW / 2, barY + 58, c);
+}
+
+function drawStateBadge(cx, cy, c) {
+  const label = playerState.toUpperCase();
+  const icon = playerState === 'playing' ? '▶' : playerState === 'paused' ? 'Ⅱ' : '■';
+  rectMode(CENTER);
+  stroke(c[0], c[1], c[2], 180);
+  fill(c[0], c[1], c[2], 48);
+  rect(cx, cy, 170, 34, 18);
+  fill(255);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(12);
+  text(`${icon} ${label}`, cx, cy);
+  rectMode(CORNER);
+}
+
+function getProgressRatio() {
+  if (playerState === 'stopped') return 0;
+  const elapsed = playerState === 'paused' ? pauseElapsedMs : max(0, millis() - trackStartMs);
+  return constrain(elapsed / max(currentTrackDurationMs, 1), 0, 1);
+}
+
+function formatTime(ms) {
+  ms = max(0, ms || 0);
+  const totalSec = floor(ms / 1000);
+  const m = floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${nf(s, 2)}`;
+}
+
+function drawHandSimple(hand) {
+  const pts = hand.keypoints;
+  stroke(0,255,255,110);
+  strokeWeight(2);
+  const connections = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  connections.forEach(([a,b]) => {
+    line(map(pts[a].x,0,640,0,width), map(pts[a].y,0,480,0,height), map(pts[b].x,0,640,0,width), map(pts[b].y,0,480,0,height));
+  });
+}
+
+function countExtendedFingers(hand) {
+  const kp = hand.keypoints;
+  const palm = kp[9];
+  let count = 0;
+  const thumbOpen = dist(kp[4].x, kp[4].y, palm.x, palm.y) > dist(kp[3].x, kp[3].y, palm.x, palm.y) + 18;
+  if (thumbOpen) count++;
+  if (kp[8].y < kp[6].y - 10) count++;
+  if (kp[12].y < kp[10].y - 10) count++;
+  if (kp[16].y < kp[14].y - 10) count++;
+  if (kp[20].y < kp[18].y - 10) count++;
+  return constrain(count, 0, 5);
+}
+
+function detectSelectionGesture(activeHands) {
+  const total = activeHands.map(countExtendedFingers).reduce((a,b)=>a+b,0);
+  if (total >= 1 && total <= 6) return String(total);
+  return '';
+}
+
+function updateSelectionGesture(selection) {
+  if (selection === selectionCandidate) selectionStableFrames++;
+  else {
+    selectionCandidate = selection;
+    selectionStableFrames = 0;
+  }
+
+  const stable = selectionStableFrames > SELECTION_STABLE_FRAMES;
+  const cooled = frameCount - lastSelectionTriggerFrame > SELECTION_COOLDOWN_FRAMES;
+
+  if (selection && stable && cooled && tracks[selection]) {
+    selectedTrackKey = selection;
+    currentSongColor = tracks[selection].color;
+    lastSelectionTriggerFrame = frameCount;
+    playUITone(1100);
+    setLog(`SELECTED ${tracks[selection].shortTitle}`);
+  }
+}
+
+function thumbAndIndexTouching(hand) {
+  const kp = hand.keypoints;
+  const wrist = kp[0];
+  const palm = kp[9];
+  const handScale = dist(wrist.x, wrist.y, palm.x, palm.y);
+  return dist(kp[4].x, kp[4].y, kp[8].x, kp[8].y) < max(22, handScale * 0.42);
+}
+
+function isFingerExtended(hand, tipIdx, pipIdx) {
+  const kp = hand.keypoints;
+  return kp[tipIdx].y < kp[pipIdx].y - 10;
+}
+
+function isOKPlayGesture(hand) {
+  if (!thumbAndIndexTouching(hand)) return false;
+  return isFingerExtended(hand, 12, 10) && isFingerExtended(hand, 16, 14) && isFingerExtended(hand, 20, 18);
+}
+
+function detectControlGesture(activeHands) {
+  const counts = activeHands.map(countExtendedFingers);
+  if (activeHands.length >= 2 && counts[0] === 0 && counts[1] === 0) return 'STOP';
+  if (activeHands.length === 1 && counts[0] === 0) return 'PAUSE';
+  for (const hand of activeHands) if (isOKPlayGesture(hand)) return 'PLAY';
+  return '';
+}
+
+function updateControlGesture(control) {
+  if (control === controlCandidate) controlStableFrames++;
+  else {
+    controlCandidate = control;
+    controlStableFrames = 0;
+  }
+  const stable = controlStableFrames > CONTROL_STABLE_FRAMES;
+  const cooled = frameCount - lastControlTriggerFrame > CONTROL_COOLDOWN_FRAMES;
+  if (control && stable && cooled) {
+    if (control === 'PLAY') startOrResumeSelectedTrack();
+    if (control === 'PAUSE') pausePlayback();
+    if (control === 'STOP') stopPlayback(true);
+    lastControlTriggerFrame = frameCount;
+  }
+}
+
+function getMp3ForTrack(track) {
+  if (!track) return { sound: null, loaded: false };
+  if (track.instrument === 'mp3_roar') return { sound: roarSound, loaded: roarLoaded };
+  if (track.instrument === 'mp3_waltz') return { sound: waltzSound, loaded: waltzLoaded };
+  if (track.instrument === 'mp3_interlude') return { sound: interludeSound, loaded: interludeLoaded };
+  if (track.instrument === 'mp3_totoro') return { sound: totoroThemeSound, loaded: totoroThemeLoaded };
+  return { sound: null, loaded: false };
+}
+
+function startOrResumeSelectedTrack() {
+  if (!tracks[selectedTrackKey]) return;
+  if (playerState === 'paused' && playingTrackKey === selectedTrackKey) return resumePlayback();
+  playSelectedTrackFromStart();
+}
+
+function playSelectedTrackFromStart() {
+  stopPlayback(false);
+  const track = tracks[selectedTrackKey];
+  playingTrackKey = selectedTrackKey;
+  playerState = 'playing';
+  currentSongTitle = track.title;
+  currentSongColor = track.color;
+  pauseElapsedMs = 0;
+  audioPauseTime = 0;
+  trackStartMs = millis();
+  currentTrackDurationMs = getTrackDurationMs(track);
+
+  if (track.instrument.startsWith('mp3_')) {
+    const { sound, loaded } = getMp3ForTrack(track);
+    if (loaded && sound) {
+      sound.stop();
+      sound.setVolume(0.9);
+      sound.play();
+      if (sound.duration && sound.duration() > 0) currentTrackDurationMs = sound.duration() * 1000;
+      setLog(`PLAYING ${track.shortTitle}`);
+      playUITone(1400);
+    } else {
+      setLog(`${track.shortTitle} NOT READY OR FILE NOT FOUND`);
+      playUITone(220);
+      playerState = 'stopped';
+      playingTrackKey = null;
+      currentSongTitle = 'No music playing';
+    }
+    return;
+  }
+
+  scheduleSynthTrack(track, 0);
+  setLog(`PLAYING ${track.shortTitle}`);
+  playUITone(1400);
+}
+
+function pausePlayback() {
+  if (playerState !== 'playing') return;
+  const track = tracks[playingTrackKey];
+  pauseElapsedMs = millis() - trackStartMs;
+  clearAllTimers();
+  stopAllOscillators();
+
+  if (track && track.instrument.startsWith('mp3_')) {
+    const { sound } = getMp3ForTrack(track);
+    if (sound && sound.isPlaying()) {
+      audioPauseTime = sound.currentTime();
+      sound.pause();
+    }
+  }
+
+  playerState = 'paused';
+  setLog('PAUSED');
+}
+
+function resumePlayback() {
+  if (playerState !== 'paused' || !playingTrackKey) return;
+  const track = tracks[playingTrackKey];
+  playerState = 'playing';
+  trackStartMs = millis() - pauseElapsedMs;
+  currentSongTitle = track.title;
+  currentSongColor = track.color;
+
+  if (track.instrument.startsWith('mp3_')) {
+    const { sound } = getMp3ForTrack(track);
+    if (sound) {
+      sound.play(0, 1, 0.9, audioPauseTime);
+      setLog(`RESUMED ${track.shortTitle}`);
+    }
+    return;
+  }
+
+  scheduleSynthTrack(track, pauseElapsedMs);
+  setLog(`RESUMED ${track.shortTitle}`);
+}
+
+function stopPlayback(showLog = true) {
+  clearAllTimers();
+  stopAllOscillators();
+  if (roarSound && roarSound.isPlaying()) roarSound.stop();
+  if (waltzSound && waltzSound.isPlaying()) waltzSound.stop();
+  if (interludeSound && interludeSound.isPlaying()) interludeSound.stop();
+  if (totoroThemeSound && totoroThemeSound.isPlaying()) totoroThemeSound.stop();
+  playerState = 'stopped';
+  playingTrackKey = null;
+  pauseElapsedMs = 0;
+  audioPauseTime = 0;
+  currentSongTitle = 'No music playing';
+  if (showLog) setLog('STOPPED');
+}
+
+function clearAllTimers() {
+  timers.forEach(t => clearTimeout(t));
+  timers = [];
+}
+
+function stopAllOscillators() {
+  activeOscillators.forEach(o => { try { o.stop(); } catch(e) {} });
+  activeOscillators = [];
+}
+
+function getTrackDurationMs(track) {
+  if (track.instrument.startsWith('mp3_')) {
+    const { sound } = getMp3ForTrack(track);
+    if (sound && sound.duration && sound.duration() > 0) return sound.duration() * 1000;
+    return 1;
+  }
+  const events = buildTrackEvents(track);
+  let last = 0;
+  events.forEach(e => last = max(last, e.time + e.dur));
+  return max(last, 1);
+}
+
+function scheduleSynthTrack(track, offsetMs) {
+  clearAllTimers();
+  const events = buildTrackEvents(track);
+  let lastTime = 0;
+
+  events.forEach(event => {
+    lastTime = max(lastTime, event.time + event.dur);
+    if (event.time + event.dur < offsetMs) return;
+    const delay = max(0, event.time - offsetMs);
+    const timer = setTimeout(() => {
+      if (playerState !== 'playing' || playingTrackKey !== track.key) return;
+      if (event.note) playInstrumentNote(event.freq, event.dur, event.instrument, event.volume);
+      if (event.chord) playChord(event.chord, event.dur, event.instrument, event.volume);
+    }, delay);
+    timers.push(timer);
+  });
+
+  const endTimer = setTimeout(() => {
+    if (playerState === 'playing' && playingTrackKey === track.key) {
+      playerState = 'stopped';
+      playingTrackKey = null;
+      currentSongTitle = 'No music playing';
+      setLog(`${track.shortTitle} COMPLETE`);
+    }
+  }, max(0, lastTime - offsetMs + 800));
+  timers.push(endTimer);
+}
+
+function buildTrackEvents(track) {
+  let events = [];
+  appendSequenceEvents(events, track.melody || [], track.instrument, track.tempo || 1, 1.0, 0);
+  appendSequenceEvents(events, track.bass || [], 'bass', track.tempo || 1, 0.72, 0);
+  events.sort((a,b) => a.time - b.time);
+  return events;
+}
+
+function appendSequenceEvents(events, sequence, instrument, tempo, volume, startAt) {
+  let t = startAt;
+  sequence.forEach(step => {
+    const dur = step.d * tempo;
+    if (step.n && step.n !== 'R') events.push({ time: t, dur, instrument, volume, note: step.n, freq: NOTES[step.n] });
+    if (step.chord) events.push({ time: t, dur, instrument, volume, chord: step.chord });
+    t += dur;
+  });
+}
+
+function trackOsc(o) { activeOscillators.push(o); return o; }
+
+function playChord(noteNames, dur, instrument, volumeScale = 1) {
+  noteNames.forEach((name, i) => {
+    const timer = setTimeout(() => playInstrumentNote(NOTES[name], dur, instrument, volumeScale * 0.75), i * 24);
+    timers.push(timer);
+  });
+}
+
+function playInstrumentNote(freq, dur, instrument, volumeScale = 1) {
+  if (!freq) return;
+  if (instrument === 'piano') playPianoNote(freq, dur, volumeScale);
+  else if (instrument === 'violin') playViolinNote(freq, dur, volumeScale);
+  else if (instrument === 'musicbox') playMusicBoxNote(freq, dur, volumeScale);
+  else if (instrument === 'bass') playBassNote(freq, dur, volumeScale);
+}
+
+function playPianoNote(freq, dur, volumeScale = 1) {
+  let env = new p5.Envelope();
+  env.setADSR(0.001, 0.07, 0.22, 0.22);
+  env.setRange(0.45 * volumeScale, 0);
+  let s1 = trackOsc(new p5.Oscillator('triangle'));
+  let s2 = trackOsc(new p5.Oscillator('sine'));
+  s1.freq(freq); s2.freq(freq * 2.01); s1.start(); s2.start(); s2.amp(0.10 * volumeScale); env.play(s1);
+  setTimeout(() => { try { s1.stop(); s2.stop(); } catch(e) {} }, dur + 650);
+}
+
+function playViolinNote(freq, dur, volumeScale = 1) {
+  let env = new p5.Envelope();
+  env.setADSR(0.12, 0.12, 0.38, 0.28);
+  env.setRange(0.28 * volumeScale, 0);
+  let s1 = trackOsc(new p5.Oscillator('sawtooth'));
+  let s2 = trackOsc(new p5.Oscillator('triangle'));
+  s1.freq(freq); s2.freq(freq * 2.005); s1.start(); s2.start(); s2.amp(0.055 * volumeScale); env.play(s1);
+  setTimeout(() => { try { s1.stop(); s2.stop(); } catch(e) {} }, dur + 700);
+}
+
+function playMusicBoxNote(freq, dur, volumeScale = 1) {
+  let env = new p5.Envelope();
+  env.setADSR(0.001, 0.04, 0.12, 0.25);
+  env.setRange(0.38 * volumeScale, 0);
+  let s1 = trackOsc(new p5.Oscillator('triangle'));
+  let s2 = trackOsc(new p5.Oscillator('sine'));
+  s1.freq(freq); s2.freq(freq * 2.0); s1.start(); s2.start(); s2.amp(0.06 * volumeScale); env.play(s1);
+  setTimeout(() => { try { s1.stop(); s2.stop(); } catch(e) {} }, dur + 500);
+}
+
+function playBassNote(freq, dur, volumeScale = 1) {
+  let env = new p5.Envelope();
+  env.setADSR(0.005, 0.06, 0.25, 0.16);
+  env.setRange(0.42 * volumeScale, 0);
+  let s = trackOsc(new p5.Oscillator('square'));
+  s.freq(freq); s.start(); env.play(s);
+  setTimeout(() => { try { s.stop(); } catch(e) {} }, dur + 450);
+}
+
+function drawTopText() {
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(18);
+  text('Gesture Music Player - Stable Lite', width / 2, 24);
+  fill(0,255,255,175);
+  textSize(10);
+  text('第 3 首 = My Neighbor Totoro Theme.mp3 ｜ 第 4 首 = Waltz in A-flat major.mp3 ｜ 第 5 首 = Interlude Lonesome George\'s Dream.mp3', width / 2, 44);
+}
+
+function drawBottomGuide() {
+  const items = ['1','2','3','4','5','6'];
+  const panelW = min(1120, width - 40);
+  const panelH = 126;
+  const x = width / 2 - panelW / 2;
+  const y = height - panelH - 18;
+  const cellW = panelW / items.length;
+
+  noFill();
+  stroke(0,255,255,115);
+  rect(x, y, panelW, panelH, 14);
+  fill(0,255,255,22);
+  rect(x, y, panelW, panelH, 14);
+
+  items.forEach((key, i) => {
+    const tr = tracks[key];
+    const c = tr.color;
+    const selected = selectedTrackKey === key;
+    const cx = x + i * cellW + cellW / 2;
+    stroke(c[0], c[1], c[2], selected ? 255 : 120);
+    fill(selected ? color(c[0], c[1], c[2], 68) : color(0,0,0,0));
+    rect(x + i * cellW + 8, y + 12, cellW - 16, 92, 10);
+    fill(c[0], c[1], c[2]);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(12);
+    text(key, cx, y + 28);
+    fill(255);
+    textSize(9);
+    text(tr.shortTitle, cx, y + 54);
+    fill(255, 180);
+    textSize(8);
+    text(tr.title, cx, y + 90);
+  });
+
+  fill(255,170);
+  noStroke();
+  textSize(10);
+  textAlign(CENTER, CENTER);
+  text('控制：OK = 播放 / 繼續 ｜ 單手握拳 = 暫停 ｜ 雙手握拳 = 停止', width / 2, y + 114);
+}
+</script>
+</body>
 </html>
