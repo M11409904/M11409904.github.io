@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gesture Music Player - 美化版</title>
+    <title>Gesture Music Player - 5 Gestures Edition</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
@@ -67,63 +67,34 @@
     <div id="status-log">SYSTEM IDLE</div>
 
     <script>
-      // =========================
-      // 基本系統
-      // =========================
       let video, handPose, hands = [];
       let isReady = false;
       let modelCheckTimer = 0;
 
       let uiOsc, uiEnv;
-      let mainColor;
-      let colors = ['#00ffff', '#ff00ff', '#ffff00'];
-      let colorIdx = 0;
+      let currentSongColor = [0, 255, 255];
 
-      // =========================
-      // 圖片
-      // =========================
-      const DEFAULT_AVATAR_FILE = 'totoro_cutout.png';
+      const DEFAULT_ART_FILE = 'totoro_cutout.png';
       let fallbackImg = null;
-      let fallbackReady = false;
-
-      const trackArtFiles = {
-        '1': 'cover_1_mozart.png',
-        '2': 'cover_2_furelise.png',
-        '3': 'cover_3_totoro.png',
-        '4': 'cover_4_spring.png',
-        '5': 'cover_5_canon.png',
-        '6': 'cover_6_roar.png'
-      };
-
       let trackImages = {};
       let artFlashTimer = 0;
 
-      // =========================
-      // 音樂
-      // =========================
       let roarSound = null;
       let roarLoaded = false;
-
       let activeOscillators = [];
       let songTimers = [];
 
-      let selectedTrackKey = '1';
+      let selectedTrackKey = 'LIKE';
       let playingTrackKey = null;
-      let playerState = 'stopped'; // stopped / playing / paused
+      let playerState = 'stopped';
       let currentSongTitle = 'No music playing';
-      let currentSongColor = [0, 255, 255];
-
       let trackStartMs = 0;
       let pauseElapsedMs = 0;
       let audioPauseTime = 0;
       let currentTrackDurationMs = 1;
 
-      // =========================
-      // 手勢狀態
-      // =========================
       let handCounts = [];
-      let detectedFingerCount = 0;
-
+      let detectedGestureLabel = '-';
       let selectionCandidate = '';
       let selectionStableFrames = 0;
       let lastSelectionTriggerFrame = -999;
@@ -136,11 +107,7 @@
       const CONTROL_STABLE_FRAMES = 18;
       const SELECTION_COOLDOWN_FRAMES = 55;
       const CONTROL_COOLDOWN_FRAMES = 55;
-      const MAX_FINGER_COUNT = 6;
 
-      // =========================
-      // 音高
-      // =========================
       const NOTES = {
         C2: 65.41, Cs2: 69.30, D2: 73.42, Ds2: 77.78, E2: 82.41, F2: 87.31, Fs2: 92.50, G2: 98.00, Gs2: 103.83, A2: 110.00, As2: 116.54, B2: 123.47,
         C3: 130.81, Cs3: 138.59, D3: 146.83, Ds3: 155.56, E3: 164.81, F3: 174.61, Fs3: 185.00, G3: 196.00, Gs3: 207.65, A3: 220.00, As3: 233.08, B3: 246.94,
@@ -151,84 +118,32 @@
 
       function N(n, d) { return { n, d }; }
       function C(chord, d) { return { chord, d }; }
-
-      function cloneSeq(seq) {
-        return seq.map(step => ({ ...step, chord: step.chord ? [...step.chord] : undefined }));
-      }
-
-      function rep(seq, times) {
-        let out = [];
-        for (let i = 0; i < times; i++) out = out.concat(cloneSeq(seq));
-        return out;
-      }
-
       function seq(...items) { return items; }
+      function cloneSeq(s) { return s.map(step => ({ ...step, chord: step.chord ? [...step.chord] : undefined })); }
+      function rep(s, times) { let out = []; for (let i = 0; i < times; i++) out = out.concat(cloneSeq(s)); return out; }
 
-      // =========================
-      // 曲目資料
-      // =========================
+      const trackArtFiles = {
+        LIKE: 'cover_1_mozart.png',
+        V: 'cover_2_furelise.png',
+        HEART: 'cover_4_spring.png',
+        TIGER: 'cover_6_roar.png',
+        DOUBLE_V: 'cover_3_totoro.png'
+      };
+
       const tracks = buildTracks();
 
       function buildTracks() {
-        const mozA = seq(
-          N('G4',220), N('D4',220), N('G4',220), N('B4',220),
-          N('D5',440), N('B4',220), N('G4',440),
-          N('D5',220), N('B4',220), N('D5',220), N('G5',220),
-          N('Fs5',300), N('E5',140), N('D5',440)
-        );
-        const mozB = seq(
-          N('E5',220), N('C5',220), N('E5',220), N('G5',220),
-          N('Fs5',300), N('E5',140), N('D5',440),
-          N('B4',220), N('G4',220), N('A4',220), N('Fs4',220), N('G4',660)
-        );
-        const mozC = seq(
-          N('B4',220), N('D5',220), N('G5',220), N('B5',220),
-          N('A5',220), N('G5',220), N('Fs5',220), N('E5',220),
-          N('D5',220), N('C5',220), N('B4',220), N('A4',220), N('G4',700)
-        );
+        const mozA = seq(N('G4',220), N('D4',220), N('G4',220), N('B4',220), N('D5',440), N('B4',220), N('G4',440), N('D5',220), N('B4',220), N('D5',220), N('G5',220), N('Fs5',300), N('E5',140), N('D5',440));
+        const mozB = seq(N('E5',220), N('C5',220), N('E5',220), N('G5',220), N('Fs5',300), N('E5',140), N('D5',440), N('B4',220), N('G4',220), N('A4',220), N('Fs4',220), N('G4',660));
+        const mozC = seq(N('B4',220), N('D5',220), N('G5',220), N('B5',220), N('A5',220), N('G5',220), N('Fs5',220), N('E5',220), N('D5',220), N('C5',220), N('B4',220), N('A4',220), N('G4',700));
         const mozMelody = rep(mozA, 2).concat(rep(mozB, 2)).concat(rep(mozC, 2)).concat(rep(mozA, 1)).concat(rep(mozB, 1));
         const mozBass = rep(seq(N('G3',440), N('D3',440), N('G3',440), N('D3',440), N('C3',440), N('D3',440), N('G2',880)), 6);
 
-        const furA = seq(
-          N('E5',160), N('Ds5',160), N('E5',160), N('Ds5',160),
-          N('E5',160), N('B4',160), N('D5',160), N('C5',160), N('A4',420),
-          N('C4',160), N('E4',160), N('A4',160), N('B4',420)
-        );
-        const furB = seq(
-          N('E4',160), N('Gs4',160), N('B4',160), N('C5',420),
-          N('E4',160), N('E5',160), N('Ds5',160), N('E5',160),
-          N('Ds5',160), N('E5',160), N('B4',160), N('D5',160), N('C5',160), N('A4',520)
-        );
-        const furC = seq(
-          N('A4',180), N('B4',180), N('C5',180), N('E5',180),
-          N('A5',360), N('G5',180), N('E5',180), N('C5',180),
-          N('G4',180), N('E4',360), N('A4',180), N('C5',180), N('E5',540)
-        );
+        const furA = seq(N('E5',160), N('Ds5',160), N('E5',160), N('Ds5',160), N('E5',160), N('B4',160), N('D5',160), N('C5',160), N('A4',420), N('C4',160), N('E4',160), N('A4',160), N('B4',420));
+        const furB = seq(N('E4',160), N('Gs4',160), N('B4',160), N('C5',420), N('E4',160), N('E5',160), N('Ds5',160), N('E5',160), N('Ds5',160), N('E5',160), N('B4',160), N('D5',160), N('C5',160), N('A4',520));
+        const furC = seq(N('A4',180), N('B4',180), N('C5',180), N('E5',180), N('A5',360), N('G5',180), N('E5',180), N('C5',180), N('G4',180), N('E4',360), N('A4',180), N('C5',180), N('E5',540));
         const furMelody = rep(furA, 2).concat(rep(furB, 2)).concat(rep(furC, 2)).concat(rep(furA, 1)).concat(rep(furB, 1));
         const furBass = rep(seq(N('A2',640), N('E3',640), N('A2',640), N('E3',640), N('A2',880)), 7);
-
-        const totoA = seq(
-          N('G4',220), N('B4',220), N('D5',220), N('G5',380),
-          N('Fs5',180), N('E5',180), N('D5',220), N('B4',220),
-          N('A4',220), N('B4',220), N('D5',440)
-        );
-        const totoB = seq(
-          N('G4',220), N('A4',220), N('B4',220), N('D5',220),
-          N('E5',380), N('D5',180), N('B4',180), N('A4',220),
-          N('G4',220), N('B4',220), N('D5',440)
-        );
-        const totoC = seq(
-          N('D5',180), N('E5',180), N('G5',220), N('A5',220),
-          N('G5',220), N('E5',220), N('D5',220), N('B4',220),
-          N('A4',220), N('G4',220), N('D5',660)
-        );
-        const totoD = seq(
-          N('G4',220), N('B4',220), N('D5',220), N('G5',220),
-          N('A5',220), N('G5',220), N('Fs5',220), N('E5',220),
-          N('D5',220), N('B4',220), N('A4',220), N('G4',700)
-        );
-        const totoMelody = rep(totoA, 2).concat(rep(totoB, 2)).concat(rep(totoC, 2)).concat(rep(totoD, 2));
-        const totoBass = rep(seq(N('G3',440), N('D3',440), N('E3',440), N('B2',440), N('C3',440), N('D3',440), N('G2',880)), 6);
 
         const springA = seq(N('E5',180), N('E5',180), N('E5',180), N('D5',180), N('C5',360), N('C5',180), N('D5',180), N('E5',360));
         const springB = seq(N('G5',180), N('G5',180), N('G5',180), N('F5',180), N('E5',360), N('D5',180), N('C5',180), N('B4',360));
@@ -237,392 +152,161 @@
         const springMelody = rep(springA, 2).concat(rep(springB, 2)).concat(rep(springC, 2)).concat(rep(springD, 2)).concat(rep(springA, 1));
         const springBass = rep(seq(N('C3',720), N('G2',720), N('C3',720), N('G2',720), N('C3',720)), 6);
 
-        const canonA = seq(
-          C(['D4','Fs4','A4'], 520), C(['A3','Cs4','E4'], 520),
-          C(['B3','D4','Fs4'], 520), C(['Fs3','A3','Cs4'], 520),
-          C(['G3','B3','D4'], 520), C(['D3','Fs3','A3'], 520),
-          C(['G3','B3','D4'], 520), C(['A3','Cs4','E4'], 520)
-        );
-        const canonB = seq(N('Fs4',180), N('E4',180), N('D4',180), N('Cs4',180), N('B3',180), N('A3',180), N('B3',180), N('Cs4',180), N('D4',700));
-        const canonMelody = rep(canonA, 3).concat(rep(canonB, 3));
-        const canonBass = rep(seq(N('D2',520), N('A2',520), N('B2',520), N('Fs2',520), N('G2',520), N('D2',520), N('G2',520), N('A2',520)), 3);
+        const totoA = seq(N('G4',220), N('B4',220), N('D5',220), N('G5',380), N('Fs5',180), N('E5',180), N('D5',220), N('B4',220), N('A4',220), N('B4',220), N('D5',440));
+        const totoB = seq(N('G4',220), N('A4',220), N('B4',220), N('D5',220), N('E5',380), N('D5',180), N('B4',180), N('A4',220), N('G4',220), N('B4',220), N('D5',440));
+        const totoC = seq(N('D5',180), N('E5',180), N('G5',220), N('A5',220), N('G5',220), N('E5',220), N('D5',220), N('B4',220), N('A4',220), N('G4',220), N('D5',660));
+        const totoD = seq(N('G4',220), N('B4',220), N('D5',220), N('G5',220), N('A5',220), N('G5',220), N('Fs5',220), N('E5',220), N('D5',220), N('B4',220), N('A4',220), N('G4',700));
+        const totoMelody = rep(totoA, 2).concat(rep(totoB, 2)).concat(rep(totoC, 2)).concat(rep(totoD, 2));
+        const totoBass = rep(seq(N('G3',440), N('D3',440), N('E3',440), N('B2',440), N('C3',440), N('D3',440), N('G2',880)), 6);
 
         return {
-          '1': { key: '1', title: '1 - Mozart / Eine kleine Nachtmusik', shortTitle: 'MOZART VIOLIN', instrument: 'violin', color: [255, 90, 140], tempo: 1.0, melody: mozMelody, bass: mozBass },
-          '2': { key: '2', title: '2 - Beethoven / Fur Elise', shortTitle: 'BEETHOVEN PIANO', instrument: 'piano', color: [120, 220, 255], tempo: 1.0, melody: furMelody, bass: furBass },
-          '3': { key: '3', title: '3 - My Neighbor Totoro Theme', shortTitle: 'TOTORO THEME', instrument: 'musicbox', color: [150, 255, 190], tempo: 1.0, melody: totoMelody, bass: totoBass },
-          '4': { key: '4', title: '4 - Vivaldi / Spring', shortTitle: 'VIVALDI STRINGS', instrument: 'strings', color: [150, 255, 160], tempo: 0.92, melody: springMelody, bass: springBass },
-          '5': { key: '5', title: '5 - Pachelbel / Canon in D', shortTitle: 'CANON ORCHESTRA', instrument: 'pad', color: [220, 160, 255], tempo: 1.05, melody: canonMelody, bass: canonBass },
-          '6': { key: '6', title: '6 - Katy Perry / Roar.mp3', shortTitle: 'ROAR MP3', instrument: 'mp3', color: [255, 120, 80], file: 'Katy Perry - Roar.mp3' }
+          LIKE: {
+            key: 'LIKE',
+            shortTitle: 'MOZART VIOLIN',
+            title: 'Mozart / Eine kleine Nachtmusik',
+            gestureLabel: '讚 👍',
+            instrument: 'violin',
+            color: [255, 90, 140],
+            tempo: 1.0,
+            melody: mozMelody,
+            bass: mozBass
+          },
+          V: {
+            key: 'V',
+            shortTitle: 'BEETHOVEN PIANO',
+            title: 'Beethoven / Fur Elise',
+            gestureLabel: 'V ✌️',
+            instrument: 'piano',
+            color: [120, 220, 255],
+            tempo: 1.0,
+            melody: furMelody,
+            bass: furBass
+          },
+          HEART: {
+            key: 'HEART',
+            shortTitle: 'VIVALDI STRINGS',
+            title: 'Vivaldi / Spring',
+            gestureLabel: '愛心',
+            instrument: 'strings',
+            color: [150, 255, 160],
+            tempo: 0.92,
+            melody: springMelody,
+            bass: springBass
+          },
+          TIGER: {
+            key: 'TIGER',
+            shortTitle: 'ROAR MP3',
+            title: 'Katy Perry / Roar.mp3',
+            gestureLabel: '老虎',
+            instrument: 'mp3',
+            color: [255, 120, 80],
+            file: 'Katy Perry - Roar.mp3'
+          },
+          DOUBLE_V: {
+            key: 'DOUBLE_V',
+            shortTitle: 'TOTORO THEME',
+            title: 'My Neighbor Totoro Theme',
+            gestureLabel: '雙手 V',
+            instrument: 'musicbox',
+            color: [150, 255, 190],
+            tempo: 1.0,
+            melody: totoMelody,
+            bass: totoBass
+          }
         };
       }
 
-      // =========================
-      // setup
-      // =========================
-      function setup() {
-        createCanvas(windowWidth, windowHeight);
-        mainColor = color(colors[colorIdx]);
-        angleMode(DEGREES);
-        textFont('Courier New');
-
-        uiOsc = new p5.Oscillator('sine');
-        uiEnv = new p5.Envelope();
-        uiEnv.setADSR(0.001, 0.05, 0.1, 0.1);
-        uiEnv.setRange(0.45, 0);
-
-        fallbackImg = loadImage(
-          DEFAULT_AVATAR_FILE,
-          () => { fallbackReady = true; updateLog('FALLBACK IMAGE READY'); },
-          () => { fallbackReady = false; updateLog('FALLBACK IMAGE NOT FOUND'); }
-        );
-
-        for (const key in trackArtFiles) {
-          trackImages[key] = null;
-          loadImage(trackArtFiles[key], img => { trackImages[key] = img; }, () => { trackImages[key] = null; });
-        }
-
-        handPose = ml5.handPose({ flipped: true, maxHands: 2 }, () => {
-          document.getElementById('loading-msg').style.display = 'none';
-          document.getElementById('init-btn').style.display = 'block';
-          updateLog('MODEL ENGINE READY');
-        });
-      }
-
-      function initSystem() {
-        userStartAudio();
-        playBootSound();
-        loadRoarSound();
-
-        video = createCapture(VIDEO, () => {
-          document.getElementById('overlay').style.display = 'none';
-          startDetection();
-        });
-        video.size(640, 480);
-        video.hide();
-      }
-
-      function startDetection() {
-        isReady = true;
-        updateLog('INITIALIZING DETECTOR...');
-
-        handPose.detectStart(video, results => {
-          hands = results;
-          modelCheckTimer = 0;
-        });
-      }
-
-      function updateLog(msg) {
-        document.getElementById('status-log').innerText = `LOG: ${msg}`;
-      }
-
-      function playUITone(freq) {
-        uiOsc.freq(freq);
-        uiOsc.start();
-        uiEnv.play(uiOsc);
-      }
-
-      function playBootSound() {
-        let f = 300;
-        let interval = setInterval(() => {
-          playUITone(f);
-          f += 220;
-          if (f > 1600) clearInterval(interval);
-        }, 50);
-      }
-
-      function loadRoarSound() {
-        roarSound = loadSound(
-          'Katy Perry - Roar.mp3',
-          () => { roarLoaded = true; updateLog('ROAR MP3 READY'); },
-          () => { roarLoaded = false; updateLog('ROAR MP3 NOT FOUND'); }
-        );
-      }
-
-      // =========================
-      // draw
-      // =========================
-      function draw() {
-        background(7, 16, 31);
-        if (!isReady) return;
-
-        drawAmbientBackground();
-
-        modelCheckTimer++;
-        if (modelCheckTimer > 240) {
-          updateLog('DETECTOR CHECK...');
-          modelCheckTimer = 0;
-        }
-
-        push();
-        translate(width, 0);
-        scale(-1, 1);
-        tint(0, 220, 255, 22);
-        image(video, 0, 0, width, height);
-        noTint();
-        pop();
-
-        if (hands && hands.length > 0) {
-          handCounts = hands.map(h => countExtendedFingers(h));
-          detectedFingerCount = constrain(handCounts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
-
-          drawMusicPlayerCard();
-
-          for (let i = 0; i < hands.length; i++) {
-            drawHandSkeleton(hands[i]);
-            drawHandTips(hands[i]);
-          }
-
-          let control = detectControlGesture(hands, handCounts);
-          updateControlGesture(control);
-
-          if (!control) {
-            let selection = detectSelectionGesture(hands, handCounts);
-            updateSelectionGesture(selection);
-          } else {
-            updateSelectionGesture('');
-          }
-        } else {
-          detectedFingerCount = 0;
-          handCounts = [];
-          updateSelectionGesture('');
-          updateControlGesture('');
-          drawMusicPlayerCard();
-          drawScanLine();
-        }
-
-        if (artFlashTimer > 0) artFlashTimer--;
-
-        drawTitleHUD();
-        drawGuideHUD();
-        drawStatusHUD();
-      }
-
-      // =========================
-      // 美化 UI
-      // =========================
-      function drawAmbientBackground() {
-        push();
-        noStroke();
-        for (let i = 0; i < 18; i++) {
-          let x = (width * noise(i * 10.1, frameCount * 0.003) + i * 73) % width;
-          let y = (height * noise(i * 19.4, frameCount * 0.002) + i * 41) % height;
-          let s = 60 + 130 * noise(i, frameCount * 0.004);
-          fill(0, 255, 255, 9);
-          circle(x, y, s);
-        }
-        pop();
-      }
-
-      function getCurrentArtwork() {
-        return trackImages[selectedTrackKey] || fallbackImg;
-      }
-
-      function getProgressRatio() {
-        if (playerState === 'stopped') return 0;
-        if (currentTrackDurationMs <= 0) return 0;
-
-        let elapsed = playerState === 'paused' ? pauseElapsedMs : millis() - trackStartMs;
-        return constrain(elapsed / currentTrackDurationMs, 0, 1);
-      }
-
-      function formatTime(ms) {
-        ms = max(0, ms || 0);
-        let totalSec = floor(ms / 1000);
-        let m = floor(totalSec / 60);
-        let s = totalSec % 60;
-        return `${m}:${nf(s, 2)}`;
-      }
-
-      function drawMusicPlayerCard() {
-        let art = getCurrentArtwork();
-        let cardW = min(520, width * 0.38);
-        let cardH = min(height * 0.72, 690);
-        cardW = max(360, cardW);
-        cardH = max(520, cardH);
-        let x = width / 2 - cardW / 2;
-        let y = 58;
-
-        let c = currentSongColor;
-        let selected = tracks[selectedTrackKey];
-        let progress = getProgressRatio();
-
-        push();
-        noStroke();
-        fill(0, 0, 0, 120);
-        rect(x + 12, y + 16, cardW, cardH, 28);
-
-        stroke(c[0], c[1], c[2], 190);
-        strokeWeight(2);
-        fill(7, 18, 34, 228);
-        rect(x, y, cardW, cardH, 28);
-
-        if (playerState === 'playing') {
-          noFill();
-          for (let i = 0; i < 3; i++) {
-            stroke(c[0], c[1], c[2], 80 - i * 20);
-            strokeWeight(2);
-            let pulse = 8 + i * 15 + sin(frameCount * 4 + i * 40) * 5;
-            rect(x - pulse, y - pulse, cardW + pulse * 2, cardH + pulse * 2, 30);
-          }
-        }
-
-        let artSize = min(cardW - 74, cardH * 0.56);
-        let artX = x + cardW / 2 - artSize / 2;
-        let artY = y + 52;
-
-        noStroke();
-        fill(0, 0, 0, 135);
-        rect(artX + 8, artY + 10, artSize, artSize, 24);
-
-        stroke(c[0], c[1], c[2], 210);
-        strokeWeight(2);
-        fill(18, 28, 45);
-        rect(artX, artY, artSize, artSize, 24);
-
-        if (art) {
-          drawingContext.save();
-          drawingContext.beginPath();
-          drawingContext.roundRect(artX + 8, artY + 8, artSize - 16, artSize - 16, 18);
-          drawingContext.clip();
-          imageMode(CORNER);
-          tint(255, 250);
-          image(art, artX + 8, artY + 8, artSize - 16, artSize - 16);
-          noTint();
-          drawingContext.restore();
-        } else {
-          drawArtworkPlaceholder(artX + 8, artY + 8, artSize - 16, artSize - 16);
-        }
-
-        if (artFlashTimer > 0) {
-          noFill();
-          stroke(255, 255, 255, 190);
-          strokeWeight(4);
-          rect(artX - 7, artY - 7, artSize + 14, artSize + 14, 28);
-        }
-
-        let infoY = artY + artSize + 36;
-        fill(c[0], c[1], c[2]);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(13);
-        text(`TRACK ${selectedTrackKey}`, x + cardW / 2, infoY);
-
-        fill(255);
-        textSize(22);
-        text(selected.shortTitle, x + cardW / 2, infoY + 30);
-
-        fill(220);
-        textSize(11);
-        text(selected.title, x + cardW / 2, infoY + 54);
-
-        fill(255, 160);
-        textSize(10);
-        text(`STYLE: ${selected.instrument.toUpperCase()}`, x + cardW / 2, infoY + 76);
-
-        let barX = x + 48;
-        let barY = infoY + 108;
-        let barW = cardW - 96;
-        let barH = 10;
-
-        noStroke();
-        fill(255, 255, 255, 42);
-        rect(barX, barY, barW, barH, 8);
-        fill(c[0], c[1], c[2], 220);
-        rect(barX, barY, barW * progress, barH, 8);
-
-        fill(255, 170);
-        textAlign(LEFT, CENTER);
-        textSize(10);
-        let elapsed = playerState === 'paused' ? pauseElapsedMs : max(0, millis() - trackStartMs);
-        text(formatTime(elapsed), barX, barY + 25);
-        textAlign(RIGHT, CENTER);
-        text(formatTime(currentTrackDurationMs), barX + barW, barY + 25);
-
-        drawStateBadge(x + cardW / 2, barY + 62, c);
-        pop();
-      }
-
-      function drawStateBadge(cx, cy, c) {
-        let label = playerState.toUpperCase();
-        let icon = playerState === 'playing' ? '▶' : playerState === 'paused' ? 'Ⅱ' : '■';
-
-        push();
-        rectMode(CENTER);
-        stroke(c[0], c[1], c[2], 180);
-        fill(c[0], c[1], c[2], 48);
-        rect(cx, cy, 170, 34, 18);
-        fill(255);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(12);
-        text(`${icon} ${label}`, cx, cy);
-        pop();
-      }
-
-      function drawArtworkPlaceholder(x, y, w, h) {
-        push();
-        fill(45, 56, 78);
-        noStroke();
-        rect(x, y, w, h, 18);
-        fill(255);
-        textAlign(CENTER, CENTER);
-        textSize(18);
-        text('NO ARTWORK', x + w / 2, y + h / 2 - 14);
-        textSize(11);
-        text('請放入對應封面圖片', x + w / 2, y + h / 2 + 12);
-        pop();
-      }
-
-      // =========================
-      // 手勢判斷
-      // =========================
-      function countExtendedFingers(hand) {
-        let kp = hand.keypoints;
-        let palm = kp[9];
-        let count = 0;
-
-        let thumbTip = kp[4];
-        let thumbIp = kp[3];
-        let thumbOpen = dist(thumbTip.x, thumbTip.y, palm.x, palm.y) > dist(thumbIp.x, thumbIp.y, palm.x, palm.y) + 18;
-        if (thumbOpen) count++;
-
-        if (kp[8].y  < kp[6].y  - 10) count++;
-        if (kp[12].y < kp[10].y - 10) count++;
-        if (kp[16].y < kp[14].y - 10) count++;
-        if (kp[20].y < kp[18].y - 10) count++;
-
-        return constrain(count, 0, 5);
-      }
-
-      function thumbAndIndexTouching(hand) {
-        let kp = hand.keypoints;
-        let thumbTip = kp[4];
-        let indexTip = kp[8];
-        let wrist = kp[0];
-        let palm = kp[9];
-        let handScale = dist(wrist.x, wrist.y, palm.x, palm.y);
-        let d = dist(thumbTip.x, thumbTip.y, indexTip.x, indexTip.y);
-        let threshold = max(22, handScale * 0.42);
-        return d < threshold;
-      }
-
-      function isFingerExtended(hand, tipIdx, pipIdx) {
-        let kp = hand.keypoints;
+      function isFingerOpen(hand, tipIdx, pipIdx) {
+        const kp = hand.keypoints;
         return kp[tipIdx].y < kp[pipIdx].y - 10;
       }
 
-      function isOKPlayGesture(hand) {
-        if (!thumbAndIndexTouching(hand)) return false;
-        let middleOpen = isFingerExtended(hand, 12, 10);
-        let ringOpen = isFingerExtended(hand, 16, 14);
-        let pinkyOpen = isFingerExtended(hand, 20, 18);
-        return middleOpen && ringOpen && pinkyOpen;
+      function isFingerCurled(hand, tipIdx, pipIdx) {
+        const kp = hand.keypoints;
+        return kp[tipIdx].y > kp[pipIdx].y - 4;
       }
 
-      function detectSelectionGesture(activeHands, counts) {
-        let total = constrain(counts.reduce((a, b) => a + b, 0), 0, MAX_FINGER_COUNT);
-        if (total >= 1 && total <= MAX_FINGER_COUNT) return String(total);
+      function isThumbUp(hand) {
+        const count = countExtendedFingers(hand);
+        if (count !== 1) return false;
+        const kp = hand.keypoints;
+        const palm = kp[9];
+        const thumbTip = kp[4];
+        const thumbIp = kp[3];
+        const thumbOpen = dist(thumbTip.x, thumbTip.y, palm.x, palm.y) > dist(thumbIp.x, thumbIp.y, palm.x, palm.y) + 18;
+        const indexClosed = isFingerCurled(hand, 8, 6);
+        const middleClosed = isFingerCurled(hand, 12, 10);
+        const ringClosed = isFingerCurled(hand, 16, 14);
+        const pinkyClosed = isFingerCurled(hand, 20, 18);
+        return thumbOpen && indexClosed && middleClosed && ringClosed && pinkyClosed;
+      }
+
+      function isVSign(hand) {
+        const indexOpen = isFingerOpen(hand, 8, 6);
+        const middleOpen = isFingerOpen(hand, 12, 10);
+        const ringClosed = isFingerCurled(hand, 16, 14);
+        const pinkyClosed = isFingerCurled(hand, 20, 18);
+        const kp = hand.keypoints;
+        const spread = dist(kp[8].x, kp[8].y, kp[12].x, kp[12].y);
+        return indexOpen && middleOpen && ringClosed && pinkyClosed && spread > 28;
+      }
+
+      function thumbIndexTouching(hand) {
+        const kp = hand.keypoints;
+        const wrist = kp[0];
+        const palm = kp[9];
+        const handScale = dist(wrist.x, wrist.y, palm.x, palm.y);
+        const d = dist(kp[4].x, kp[4].y, kp[8].x, kp[8].y);
+        return d < max(22, handScale * 0.42);
+      }
+
+      function isHeartGesture(hand) {
+        if (!thumbIndexTouching(hand)) return false;
+        const middleClosed = isFingerCurled(hand, 12, 10);
+        const ringClosed = isFingerCurled(hand, 16, 14);
+        const pinkyClosed = isFingerCurled(hand, 20, 18);
+        return middleClosed && ringClosed && pinkyClosed;
+      }
+
+      function isTigerGesture(hand) {
+        const kp = hand.keypoints;
+        const thumbFar = dist(kp[4].x, kp[4].y, kp[9].x, kp[9].y) > dist(kp[3].x, kp[3].y, kp[9].x, kp[9].y) + 10;
+        const indexCurled = isFingerCurled(hand, 8, 6);
+        const middleCurled = isFingerCurled(hand, 12, 10);
+        const ringCurled = isFingerCurled(hand, 16, 14);
+        const pinkyCurled = isFingerCurled(hand, 20, 18);
+        const allTipsFarEnough = [4,8,12,16,20].every(idx => dist(kp[idx].x, kp[idx].y, kp[9].x, kp[9].y) > 42);
+        return thumbFar && indexCurled && middleCurled && ringCurled && pinkyCurled && allTipsFarEnough;
+      }
+
+      function isOpenPalm(hand) {
+        return countExtendedFingers(hand) >= 4;
+      }
+
+      function detectSelectionGesture(activeHands) {
+        if (activeHands.length >= 2) {
+          const leftHand = activeHands.find(h => h.keypoints[9].x < 320) || activeHands[0];
+          const rightHand = activeHands.find(h => h.keypoints[9].x >= 320) || activeHands[1];
+          if (leftHand && rightHand && isVSign(leftHand) && isVSign(rightHand)) {
+            detectedGestureLabel = '雙手 V';
+            return 'DOUBLE_V';
+          }
+        }
+
+        for (const hand of activeHands) {
+          if (isHeartGesture(hand)) { detectedGestureLabel = '愛心'; return 'HEART'; }
+        }
+        for (const hand of activeHands) {
+          if (isThumbUp(hand)) { detectedGestureLabel = '讚'; return 'LIKE'; }
+        }
+        for (const hand of activeHands) {
+          if (isTigerGesture(hand)) { detectedGestureLabel = '老虎'; return 'TIGER'; }
+        }
+        for (const hand of activeHands) {
+          if (isVSign(hand)) { detectedGestureLabel = 'V'; return 'V'; }
+        }
+
+        detectedGestureLabel = '-';
         return '';
       }
 
@@ -633,8 +317,8 @@
           selectionStableFrames = 0;
         }
 
-        let stable = selectionStableFrames > SELECTION_STABLE_FRAMES;
-        let cooledDown = frameCount - lastSelectionTriggerFrame > SELECTION_COOLDOWN_FRAMES;
+        const stable = selectionStableFrames > SELECTION_STABLE_FRAMES;
+        const cooledDown = frameCount - lastSelectionTriggerFrame > SELECTION_COOLDOWN_FRAMES;
 
         if (selection && stable && cooledDown && tracks[selection]) {
           selectTrack(selection);
@@ -646,18 +330,14 @@
         selectedTrackKey = key;
         currentSongColor = tracks[key].color;
         artFlashTimer = 18;
-        updateLog(`SELECTED ${tracks[key].shortTitle}. USE OK TO PLAY.`);
+        updateLog(`SELECTED ${tracks[key].shortTitle}. USE 2 OPEN HANDS TO PLAY.`);
         playUITone(1100);
       }
 
-      function detectControlGesture(activeHands, counts) {
-        if (activeHands.length >= 2 && counts[0] === 0 && counts[1] === 0) return 'STOP';
-
-        for (let i = 0; i < activeHands.length; i++) {
-          if (isOKPlayGesture(activeHands[i])) return 'PLAY';
-        }
-
-        if (activeHands.length === 1 && counts[0] === 0) return 'PAUSE';
+      function detectControlGesture(activeHands) {
+        if (activeHands.length >= 2 && activeHands.every(h => countExtendedFingers(h) === 0)) return 'STOP';
+        if (activeHands.length === 1 && countExtendedFingers(activeHands[0]) === 0) return 'PAUSE';
+        if (activeHands.length >= 2 && activeHands.every(h => isOpenPalm(h))) return 'PLAY';
         return '';
       }
 
@@ -668,8 +348,8 @@
           controlStableFrames = 0;
         }
 
-        let stable = controlStableFrames > CONTROL_STABLE_FRAMES;
-        let cooledDown = frameCount - lastControlTriggerFrame > CONTROL_COOLDOWN_FRAMES;
+        const stable = controlStableFrames > CONTROL_STABLE_FRAMES;
+        const cooledDown = frameCount - lastControlTriggerFrame > CONTROL_COOLDOWN_FRAMES;
 
         if (control && stable && cooledDown) {
           if (control === 'PLAY') startOrResumeSelectedTrack();
@@ -679,23 +359,27 @@
         }
       }
 
-      // =========================
-      // 播放控制
-      // =========================
+      function countExtendedFingers(hand) {
+        const kp = hand.keypoints;
+        const palm = kp[9];
+        let count = 0;
+        const thumbOpen = dist(kp[4].x, kp[4].y, palm.x, palm.y) > dist(kp[3].x, kp[3].y, palm.x, palm.y) + 18;
+        if (thumbOpen) count++;
+        if (kp[8].y < kp[6].y - 10) count++;
+        if (kp[12].y < kp[10].y - 10) count++;
+        if (kp[16].y < kp[14].y - 10) count++;
+        if (kp[20].y < kp[18].y - 10) count++;
+        return constrain(count, 0, 5);
+      }
+
       function startOrResumeSelectedTrack() {
         if (!tracks[selectedTrackKey]) return;
-
-        if (playerState === 'paused' && playingTrackKey === selectedTrackKey) {
-          resumePlayback();
-          return;
-        }
-
+        if (playerState === 'paused' && playingTrackKey === selectedTrackKey) return resumePlayback();
         playSelectedTrackFromStart();
       }
 
       function playSelectedTrackFromStart() {
         stopPlayback(false);
-
         const track = tracks[selectedTrackKey];
         playingTrackKey = selectedTrackKey;
         playerState = 'playing';
@@ -731,18 +415,14 @@
 
       function pausePlayback() {
         if (playerState !== 'playing') return;
-
         const track = tracks[playingTrackKey];
         pauseElapsedMs = millis() - trackStartMs;
-
         clearSongTimers();
         stopActiveOscillators();
-
         if (track && track.instrument === 'mp3' && roarSound && roarSound.isPlaying()) {
           audioPauseTime = roarSound.currentTime();
           roarSound.pause();
         }
-
         playerState = 'paused';
         updateLog('PLAYBACK PAUSED');
         playUITone(500);
@@ -750,7 +430,6 @@
 
       function resumePlayback() {
         if (playerState !== 'paused' || !playingTrackKey) return;
-
         const track = tracks[playingTrackKey];
         playerState = 'playing';
         trackStartMs = millis() - pauseElapsedMs;
@@ -774,15 +453,12 @@
       function stopPlayback(showLog = true) {
         clearSongTimers();
         stopActiveOscillators();
-
         if (roarSound && roarSound.isPlaying && roarSound.isPlaying()) roarSound.stop();
-
         playerState = 'stopped';
         playingTrackKey = null;
         pauseElapsedMs = 0;
         audioPauseTime = 0;
         currentSongTitle = 'No music playing';
-
         if (showLog) {
           updateLog('PLAYBACK STOPPED');
           playUITone(260);
@@ -795,17 +471,13 @@
       }
 
       function stopActiveOscillators() {
-        activeOscillators.forEach(o => {
-          try { o.stop(); } catch(e) {}
-        });
+        activeOscillators.forEach(o => { try { o.stop(); } catch(e) {} });
         activeOscillators = [];
       }
 
       function getTrackDurationMs(track) {
-        if (track.instrument === 'mp3' && roarSound && roarSound.duration && roarSound.duration() > 0) {
-          return roarSound.duration() * 1000;
-        }
-        let events = buildTrackEvents(track);
+        if (track.instrument === 'mp3' && roarSound && roarSound.duration && roarSound.duration() > 0) return roarSound.duration() * 1000;
+        const events = buildTrackEvents(track);
         let last = 0;
         events.forEach(e => last = max(last, e.time + e.dur));
         return max(last, 1);
@@ -813,24 +485,19 @@
 
       function scheduleSynthTrack(track, offsetMs) {
         clearSongTimers();
-
         const events = buildTrackEvents(track);
         let lastTime = 0;
-
         events.forEach(event => {
           lastTime = max(lastTime, event.time + event.dur);
           if (event.time + event.dur < offsetMs) return;
-
           const delay = max(0, event.time - offsetMs);
           const timer = setTimeout(() => {
             if (playerState !== 'playing' || playingTrackKey !== track.key) return;
             if (event.note) playInstrumentNote(event.freq, event.dur, event.instrument, event.volume);
             if (event.chord) playChord(event.chord, event.dur, event.instrument, event.volume);
           }, delay);
-
           songTimers.push(timer);
         });
-
         const endTimer = setTimeout(() => {
           if (playerState === 'playing' && playingTrackKey === track.key) {
             playerState = 'stopped';
@@ -839,7 +506,6 @@
             updateLog(`${track.shortTitle} COMPLETE`);
           }
         }, max(0, lastTime - offsetMs + 800));
-
         songTimers.push(endTimer);
       }
 
@@ -861,10 +527,7 @@
         });
       }
 
-      function trackOsc(o) {
-        activeOscillators.push(o);
-        return o;
-      }
+      function trackOsc(o) { activeOscillators.push(o); return o; }
 
       function playChord(noteNames, dur, instrument, volumeScale = 1) {
         noteNames.forEach((name, i) => {
@@ -877,229 +540,130 @@
         if (!freq) return;
         if (instrument === 'piano') playPianoNote(freq, dur, volumeScale);
         else if (instrument === 'violin') playViolinNote(freq, dur, volumeScale);
-        else if (instrument === 'harpsichord') playHarpsichordNote(freq, dur, volumeScale);
         else if (instrument === 'strings') playStringNote(freq, dur, volumeScale);
-        else if (instrument === 'pad') playPadNote(freq, dur, volumeScale);
         else if (instrument === 'musicbox') playMusicBoxNote(freq, dur, volumeScale);
         else if (instrument === 'bass') playBassNote(freq, dur, volumeScale);
       }
 
       function playPianoNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.001, 0.07, 0.22, 0.22);
-        env.setRange(0.45 * volumeScale, 0);
-        let s1 = trackOsc(new p5.Oscillator('triangle'));
-        let s2 = trackOsc(new p5.Oscillator('sine'));
-        s1.freq(freq);
-        s2.freq(freq * 2.01);
-        s1.start();
-        s2.start();
-        s2.amp(0.10 * volumeScale);
-        env.play(s1);
+        let env = new p5.Envelope(); env.setADSR(0.001, 0.07, 0.22, 0.22); env.setRange(0.45 * volumeScale, 0);
+        let s1 = trackOsc(new p5.Oscillator('triangle')); let s2 = trackOsc(new p5.Oscillator('sine'));
+        s1.freq(freq); s2.freq(freq * 2.01); s1.start(); s2.start(); s2.amp(0.10 * volumeScale); env.play(s1);
         setTimeout(() => { try { s1.stop(); s2.stop(); } catch(e) {} }, dur + 650);
       }
 
       function playViolinNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.12, 0.12, 0.38, 0.28);
-        env.setRange(0.28 * volumeScale, 0);
-        let s1 = trackOsc(new p5.Oscillator('sawtooth'));
-        let s2 = trackOsc(new p5.Oscillator('triangle'));
-        s1.freq(freq);
-        s2.freq(freq * 2.005);
-        s1.start();
-        s2.start();
-        s2.amp(0.055 * volumeScale);
-        env.play(s1);
+        let env = new p5.Envelope(); env.setADSR(0.12, 0.12, 0.38, 0.28); env.setRange(0.28 * volumeScale, 0);
+        let s1 = trackOsc(new p5.Oscillator('sawtooth')); let s2 = trackOsc(new p5.Oscillator('triangle'));
+        s1.freq(freq); s2.freq(freq * 2.005); s1.start(); s2.start(); s2.amp(0.055 * volumeScale); env.play(s1);
         setTimeout(() => { try { s1.stop(); s2.stop(); } catch(e) {} }, dur + 700);
       }
 
-      function playHarpsichordNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.001, 0.05, 0.12, 0.12);
-        env.setRange(0.34 * volumeScale, 0);
-        let s = trackOsc(new p5.Oscillator('square'));
-        s.freq(freq);
-        s.start();
-        env.play(s);
-        setTimeout(() => { try { s.stop(); } catch(e) {} }, dur + 350);
-      }
-
       function playStringNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.06, 0.12, 0.42, 0.35);
-        env.setRange(0.32 * volumeScale, 0);
-        let s1 = trackOsc(new p5.Oscillator('sawtooth'));
-        let s2 = trackOsc(new p5.Oscillator('sawtooth'));
-        s1.freq(freq);
-        s2.freq(freq * 1.005);
-        s1.start();
-        s2.start();
-        s2.amp(0.08 * volumeScale);
-        env.play(s1);
+        let env = new p5.Envelope(); env.setADSR(0.06, 0.12, 0.42, 0.35); env.setRange(0.32 * volumeScale, 0);
+        let s1 = trackOsc(new p5.Oscillator('sawtooth')); let s2 = trackOsc(new p5.Oscillator('sawtooth'));
+        s1.freq(freq); s2.freq(freq * 1.005); s1.start(); s2.start(); s2.amp(0.08 * volumeScale); env.play(s1);
         setTimeout(() => { try { s1.stop(); s2.stop(); } catch(e) {} }, dur + 650);
       }
 
-      function playPadNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.22, 0.25, 0.28, 0.75);
-        env.setRange(0.25 * volumeScale, 0);
-        let s1 = trackOsc(new p5.Oscillator('sine'));
-        let s2 = trackOsc(new p5.Oscillator('triangle'));
-        s1.freq(freq);
-        s2.freq(freq * 1.5);
-        s1.start();
-        s2.start();
-        s2.amp(0.08 * volumeScale);
-        env.play(s1);
-        setTimeout(() => { try { s1.stop(); s2.stop(); } catch(e) {} }, dur + 1200);
-      }
-
       function playMusicBoxNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.001, 0.04, 0.12, 0.25);
-        env.setRange(0.38 * volumeScale, 0);
-        let s1 = trackOsc(new p5.Oscillator('triangle'));
-        let s2 = trackOsc(new p5.Oscillator('sine'));
-        s1.freq(freq);
-        s2.freq(freq * 2.0);
-        s1.start();
-        s2.start();
-        s2.amp(0.06 * volumeScale);
-        env.play(s1);
+        let env = new p5.Envelope(); env.setADSR(0.001, 0.04, 0.12, 0.25); env.setRange(0.38 * volumeScale, 0);
+        let s1 = trackOsc(new p5.Oscillator('triangle')); let s2 = trackOsc(new p5.Oscillator('sine'));
+        s1.freq(freq); s2.freq(freq * 2.0); s1.start(); s2.start(); s2.amp(0.06 * volumeScale); env.play(s1);
         setTimeout(() => { try { s1.stop(); s2.stop(); } catch(e) {} }, dur + 500);
       }
 
       function playBassNote(freq, dur, volumeScale = 1) {
-        let env = new p5.Envelope();
-        env.setADSR(0.005, 0.06, 0.25, 0.16);
-        env.setRange(0.42 * volumeScale, 0);
-        let s = trackOsc(new p5.Oscillator('square'));
-        s.freq(freq);
-        s.start();
-        env.play(s);
+        let env = new p5.Envelope(); env.setADSR(0.005, 0.06, 0.25, 0.16); env.setRange(0.42 * volumeScale, 0);
+        let s = trackOsc(new p5.Oscillator('square')); s.freq(freq); s.start(); env.play(s);
         setTimeout(() => { try { s.stop(); } catch(e) {} }, dur + 450);
       }
 
-      // =========================
-      // 手部視覺
-      // =========================
       function drawHandSkeleton(hand) {
-        let connections = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
-        stroke(0,255,255,120);
-        strokeWeight(2);
+        const connections = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+        stroke(0,255,255,120); strokeWeight(2);
         connections.forEach(pair => {
-          let a = hand.keypoints[pair[0]];
-          let b = hand.keypoints[pair[1]];
-          line(map(a.x, 0, 640, 0, width), map(a.y, 0, 480, 0, height), map(b.x, 0, 640, 0, width), map(b.y, 0, 480, 0, height));
+          const a = hand.keypoints[pair[0]], b = hand.keypoints[pair[1]];
+          line(map(a.x,0,640,0,width), map(a.y,0,480,0,height), map(b.x,0,640,0,width), map(b.y,0,480,0,height));
         });
       }
 
       function drawHandTips(hand) {
-        let tips = [4,8,12,16,20];
-        noFill();
-        stroke(255, 205);
-        strokeWeight(1.5);
+        const tips = [4,8,12,16,20];
+        noFill(); stroke(255,205); strokeWeight(1.5);
         tips.forEach(idx => {
-          let k = hand.keypoints[idx];
-          circle(map(k.x, 0, 640, 0, width), map(k.y, 0, 480, 0, height), 15);
+          const k = hand.keypoints[idx];
+          circle(map(k.x,0,640,0,width), map(k.y,0,480,0,height), 15);
         });
       }
 
-      // =========================
-      // HUD
-      // =========================
       function drawTitleHUD() {
         push();
-        fill(255);
-        textAlign(CENTER, CENTER);
-        textSize(18);
-        text('Gesture Music Player', width / 2, 25);
-        fill(0, 255, 255, 170);
-        textSize(10);
-        text('Show 1-6 fingers to select • OK to play/resume • Fist to pause/stop', width / 2, 47);
+        fill(255); textAlign(CENTER, CENTER); textSize(18);
+        text('Gesture Music Player - 5 Gestures', width / 2, 25);
+        fill(0,255,255,175); textSize(10);
+        text('讚 / V / 愛心 / 老虎 / 雙手 V 選曲  •  雙手張開播放  •  單拳暫停  •  雙拳停止', width / 2, 47);
         pop();
       }
 
       function drawGuideHUD() {
-        let panelW = min(1120, width - 40);
-        let panelH = 116;
-        let x = width / 2 - panelW / 2;
-        let y = height - panelH - 18;
+        const panelW = min(1140, width - 40);
+        const panelH = 126;
+        const x = width / 2 - panelW / 2;
+        const y = height - panelH - 18;
+        const items = ['LIKE','V','HEART','TIGER','DOUBLE_V'];
+        const cellW = panelW / items.length;
 
         push();
-        noFill();
-        stroke(0,255,255,115);
-        rect(x, y, panelW, panelH, 14);
-        fill(0,255,255,22);
-        rect(x, y, panelW, panelH, 14);
+        noFill(); stroke(0,255,255,115); rect(x, y, panelW, panelH, 14);
+        fill(0,255,255,22); rect(x, y, panelW, panelH, 14);
 
-        const keys = ['1','2','3','4','5','6'];
-        const cellW = panelW / keys.length;
-
-        keys.forEach((key, i) => {
+        items.forEach((key, i) => {
           const tr = tracks[key];
           const c = tr.color;
           const selected = selectedTrackKey === key;
-          let cx = x + i * cellW + cellW / 2;
+          const cx = x + i * cellW + cellW / 2;
 
           stroke(c[0], c[1], c[2], selected ? 255 : 120);
           fill(selected ? color(c[0], c[1], c[2], 68) : color(0,0,0,0));
-          rect(x + i * cellW + 8, y + 12, cellW - 16, 82, 10);
+          rect(x + i * cellW + 8, y + 12, cellW - 16, 92, 10);
 
-          fill(c[0], c[1], c[2], 255);
-          noStroke();
-          textAlign(CENTER, CENTER);
-          textSize(22);
-          text(key, cx, y + 31);
-          fill(255);
-          textSize(8);
-          text(tr.shortTitle, cx, y + 57);
-          fill(255, 150);
-          textSize(8);
-          text(tr.instrument.toUpperCase(), cx, y + 75);
+          fill(c[0], c[1], c[2], 255); noStroke(); textAlign(CENTER, CENTER);
+          textSize(12); text(tr.gestureLabel, cx, y + 28);
+          fill(255); textSize(9); text(tr.shortTitle, cx, y + 54);
+          fill(255, 150); textSize(8); text(tr.instrument.toUpperCase(), cx, y + 74);
+          fill(255, 190); textSize(8); text(tr.title, cx, y + 90);
         });
 
-        fill(255, 170);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(10);
-        text('CONTROL: OK = PLAY / RESUME    |    1 FIST = PAUSE    |    2 FISTS = STOP', width / 2, y + 104);
+        fill(255,170); noStroke(); textAlign(CENTER, CENTER); textSize(10);
+        text('CONTROL: 2 OPEN PALMS = PLAY / RESUME    |    1 FIST = PAUSE    |    2 FISTS = STOP', width / 2, y + 114);
         pop();
       }
 
       function drawStatusHUD() {
-        let c = currentSongColor;
+        const c = currentSongColor;
         push();
         translate(width - 340, 66);
-        noFill();
-        stroke(c[0], c[1], c[2], 165);
-        rect(0, 0, 300, 138, 10);
-        fill(c[0], c[1], c[2], 38);
-        rect(0, 0, 300, 138, 10);
-        fill(255);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(10);
+        noFill(); stroke(c[0], c[1], c[2], 165); rect(0, 0, 300, 148, 10);
+        fill(c[0], c[1], c[2], 38); rect(0, 0, 300, 148, 10);
+        fill(255); noStroke(); textAlign(CENTER, CENTER); textSize(10);
         text('LIVE STATUS', 150, 17);
         textSize(9);
-        text(`SELECTED : ${tracks[selectedTrackKey].shortTitle}`, 150, 39);
-        text(`STATE    : ${playerState.toUpperCase()}`, 150, 59);
-        text(`NOW      : ${currentSongTitle}`, 150, 79);
-        text(`COUNT    : ${detectedFingerCount}`, 150, 99);
-        text(`CONTROL  : ${controlCandidate || '-'}`, 150, 118);
+        text(`SELECTED : ${tracks[selectedTrackKey].shortTitle}`, 150, 41);
+        text(`STATE    : ${playerState.toUpperCase()}`, 150, 63);
+        text(`NOW      : ${currentSongTitle}`, 150, 85);
+        text(`GESTURE  : ${detectedGestureLabel}`, 150, 107);
+        text(`CONTROL  : ${controlCandidate || '-'}`, 150, 129);
         pop();
       }
 
       function drawScanLine() {
         stroke(0,255,255,70);
-        let sy = (frameCount * 4) % height;
+        const sy = (frameCount * 4) % height;
         line(0, sy, width, sy);
       }
 
-      function windowResized() {
-        resizeCanvas(windowWidth, windowHeight);
-      }
+      function windowResized() { resizeCanvas(windowWidth, windowHeight); }
     </script>
   </body>
 </html>
