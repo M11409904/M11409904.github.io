@@ -114,8 +114,8 @@ const trackArtFiles = {
   '1': 'cover_1_mozart.png',
   '2': 'cover_2_furelise.png',
   '3': 'cover_3_totoro.png',
-  '4': 'cover_4_Waltz in A-flat majo.png',
-  '5': 'cover_5_Interlude Lonesome Georges Dream.png',
+  '4': 'cover_4_waltz.png',
+  '5': 'cover_5_interlude.png',
   '6': 'cover_6_roar.png'
 };
 
@@ -273,73 +273,70 @@ function drawPlayerCard() {
   const track = tracks[selectedTrackKey];
   const art = artworks[selectedTrackKey] || fallbackImg;
   const c = currentSongColor;
-  const cardW = min(520, width * 0.42);
-  const cardH = min(690, height * 0.74);
+  const cardW = min(500, width * 0.40);
+  const cardH = min(640, height * 0.70);
   const x = width / 2 - cardW / 2;
-  const y = 60;
-  const artSize = min(cardW - 64, cardH * 0.55);
+  const y = 72;
+  const artSize = min(cardW - 90, cardH * 0.50);
   const artX = x + cardW / 2 - artSize / 2;
-  const artY = y + 36;
+  const artY = y + 32;
 
   noStroke();
-  fill(0,0,0,120);
-  rect(x + 12, y + 14, cardW, cardH, 24);
+  fill(0, 0, 0, 85);
+  rect(x + 10, y + 12, cardW, cardH, 20);
 
-  stroke(c[0], c[1], c[2], 180);
+  stroke(c[0], c[1], c[2], 150);
   strokeWeight(2);
-  fill(11, 22, 40, 228);
-  rect(x, y, cardW, cardH, 24);
+  fill(10, 20, 36, 228);
+  rect(x, y, cardW, cardH, 20);
 
-  fill(0,0,0,110);
   noStroke();
-  rect(artX + 8, artY + 10, artSize, artSize, 22);
+  fill(16, 26, 42, 255);
+  rect(artX, artY, artSize, artSize, 18);
 
-  stroke(c[0], c[1], c[2], 200);
-  fill(18, 28, 45);
-  rect(artX, artY, artSize, artSize, 22);
-
-  if (art) image(art, artX + 8, artY + 8, artSize - 16, artSize - 16);
+  if (art) {
+    image(art, artX + 8, artY + 8, artSize - 16, artSize - 16);
+  }
 
   fill(c[0], c[1], c[2]);
-  noStroke();
   textAlign(CENTER, CENTER);
   textSize(24);
-  text(track.shortTitle, x + cardW / 2, artY + artSize + 56);
-  fill(220);
-  textSize(12);
-  text(track.title, x + cardW / 2, artY + artSize + 82);
+  text(track.shortTitle, x + cardW / 2, artY + artSize + 48);
 
-  const barX = x + 42;
-  const barY = artY + artSize + 132;
-  const barW = cardW - 84;
+  fill(225);
+  textSize(12);
+  text(track.title, x + cardW / 2, artY + artSize + 76);
+
+  const barX = x + 44;
+  const barY = artY + artSize + 120;
+  const barW = cardW - 88;
   const progress = getProgressRatio();
 
-  fill(255,255,255,38);
   noStroke();
-  rect(barX, barY, barW, 10, 8);
+  fill(255, 255, 255, 34);
+  rect(barX, barY, barW, 8, 6);
   fill(c[0], c[1], c[2], 220);
-  rect(barX, barY, barW * progress, 10, 8);
+  rect(barX, barY, barW * progress, 8, 6);
 
   fill(255, 180);
-  textAlign(LEFT, CENTER);
   textSize(10);
+  textAlign(LEFT, CENTER);
   const elapsed = playerState === 'paused' ? pauseElapsedMs : max(0, millis() - trackStartMs);
-  text(formatTime(elapsed), barX, barY + 24);
+  text(formatTime(elapsed), barX, barY + 22);
   textAlign(RIGHT, CENTER);
-  text(formatTime(currentTrackDurationMs), barX + barW, barY + 24);
+  text(formatTime(currentTrackDurationMs), barX + barW, barY + 22);
 
-  drawStateBadge(x + cardW / 2, barY + 58, c);
+  drawStateBadge(x + cardW / 2, barY + 52, c);
 }
 
 function drawStateBadge(cx, cy, c) {
   const label = playerState.toUpperCase();
   const icon = playerState === 'playing' ? '▶' : playerState === 'paused' ? 'Ⅱ' : '■';
   rectMode(CENTER);
-  stroke(c[0], c[1], c[2], 180);
-  fill(c[0], c[1], c[2], 48);
-  rect(cx, cy, 170, 34, 18);
-  fill(255);
   noStroke();
+  fill(c[0], c[1], c[2], 70);
+  rect(cx, cy, 160, 30, 15);
+  fill(255);
   textAlign(CENTER, CENTER);
   textSize(12);
   text(`${icon} ${label}`, cx, cy);
@@ -693,15 +690,17 @@ function drawTopText() {
 function drawBottomGuide() {
   const items = ['1','2','3','4','5','6'];
   const panelW = min(1120, width - 40);
-  const panelH = 126;
+  const panelH = 118;
   const x = width / 2 - panelW / 2;
   const y = height - panelH - 18;
   const cellW = panelW / items.length;
 
-  noFill();
-  stroke(0,255,255,115);
+  noStroke();
+  fill(0, 255, 255, 16);
   rect(x, y, panelW, panelH, 14);
-  fill(0,255,255,22);
+  stroke(0, 255, 255, 90);
+  strokeWeight(2);
+  noFill();
   rect(x, y, panelW, panelH, 14);
 
   items.forEach((key, i) => {
@@ -709,27 +708,30 @@ function drawBottomGuide() {
     const c = tr.color;
     const selected = selectedTrackKey === key;
     const cx = x + i * cellW + cellW / 2;
-    stroke(c[0], c[1], c[2], selected ? 255 : 120);
-    fill(selected ? color(c[0], c[1], c[2], 68) : color(0,0,0,0));
-    rect(x + i * cellW + 8, y + 12, cellW - 16, 92, 10);
-    fill(c[0], c[1], c[2]);
+
+    stroke(c[0], c[1], c[2], selected ? 180 : 90);
+    strokeWeight(selected ? 2 : 1.2);
+    fill(selected ? color(c[0], c[1], c[2], 42) : color(0, 0, 0, 0));
+    rect(x + i * cellW + 10, y + 14, cellW - 20, 78, 10);
+
     noStroke();
+    fill(c[0], c[1], c[2]);
     textAlign(CENTER, CENTER);
     textSize(12);
     text(key, cx, y + 28);
     fill(255);
     textSize(9);
-    text(tr.shortTitle, cx, y + 54);
-    fill(255, 180);
+    text(tr.shortTitle, cx, y + 56);
+    fill(255, 185);
     textSize(8);
-    text(tr.title, cx, y + 90);
+    text(tr.title, cx, y + 76);
   });
 
-  fill(255,170);
   noStroke();
+  fill(255, 175);
   textSize(10);
   textAlign(CENTER, CENTER);
-  text('控制：OK = 播放 / 繼續 ｜ 單手握拳 = 暫停 ｜ 雙手握拳 = 停止', width / 2, y + 114);
+  text('控制：OK = 播放 / 繼續 ｜ 單手握拳 = 暫停 ｜ 雙手握拳 = 停止', width / 2, y + 104);
 }
 </script>
 </body>
